@@ -1,0 +1,20 @@
+{
+  "flood": {
+    "minor_water_level_m": 3.2,
+    "major_water_level_m": 4.5,
+    "critical_water_level_m": 5.5
+  },
+  "wildfire": {
+    "temp_warning_c": 55.0,
+    "temp_critical_c": 75.0,
+    "co2_spike_ppm": 1200
+  },
+  "landslide": {
+    "soil_saturation_pct": 80.0,
+    "tilt_angle_deg": 15.0
+  },
+  "air_quality": {
+    "pm25_unhealthy_ugm3": 75.0,
+    "pm25_hazardous_ugm3": 150.0
+  }
+}

@@ -1,0 +1,16 @@
+CREATE TABLE IF NOT EXISTS sensors (
+    id VARCHAR(50) PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    type VARCHAR(50) NOT NULL,
+    location_id VARCHAR(50),
+    latitude DOUBLE PRECISION NOT NULL,
+    longitude DOUBLE PRECISION NOT NULL,
+    altitude DOUBLE PRECISION DEFAULT 0.0,
+    status VARCHAR(30) DEFAULT 'ONLINE',
+    battery_level FLOAT DEFAULT 100.0,
+    signal_strength INT DEFAULT -65,
+    firmware_version VARCHAR(20) DEFAULT 'v1.0.0',
+    edge_ai_model VARCHAR(100),
+    last_ping TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);

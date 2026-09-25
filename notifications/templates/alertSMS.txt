@@ -1,0 +1,1 @@
+[EcoGuard WARNING] {{severity}} Hazard detected at {{location}}: {{title}}. Immediate response recommended. Details: {{url}}

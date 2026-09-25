@@ -1,0 +1,14 @@
+{
+  "primary_protocol": "LoRaWAN",
+  "fallback_protocol": "NB-IoT",
+  "lora": {
+    "frequency_mhz": 915.0,
+    "spreading_factor": 7,
+    "tx_power_dbm": 14
+  },
+  "wifi": {
+    "enabled": true,
+    "ssid": "EcoGuard-Mesh-Gateway",
+    "backend_url": "http://localhost:5000/api/v1/sensors/telemetry"
+  }
+}

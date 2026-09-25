@@ -1,0 +1,10 @@
+{
+  "node_id": "SN-FLD-01",
+  "sampling_interval_sec": 5,
+  "sensors": [
+    { "name": "ultrasonic_water_level", "pin": 14, "unit": "meters", "calibration_offset": 0.05 },
+    { "name": "dht22_temperature", "pin": 4, "unit": "celsius", "calibration_offset": 0.0 },
+    { "name": "dht22_humidity", "pin": 4, "unit": "percent", "calibration_offset": 0.0 },
+    { "name": "soil_moisture_analog", "pin": 32, "unit": "percent", "calibration_offset": -2.1 }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "notification": {
+    "title": "🚨 EcoGuard Alert: {{title}}",
+    "body": "{{description}}",
+    "sound": "emergency_siren.wav",
+    "badge": 1
+  },
+  "data": {
+    "alertId": "{{alertId}}",
+    "severity": "{{severity}}",
+    "latitude": "{{latitude}}",
+    "longitude": "{{longitude}}",
+    "action": "OPEN_MAP_VIEW"
+  }
+}

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>EcoGuard Emergency Alert</title>
+  <style>
+    body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 20px; }
+    .card { max-width: 600px; margin: 0 auto; background: #1e293b; border-radius: 12px; border: 1px solid #334155; padding: 24px; }
+    .header { border-bottom: 2px solid #ef4444; padding-bottom: 12px; margin-bottom: 16px; }
+    .severity { display: inline-block; padding: 4px 12px; border-radius: 20px; font-weight: bold; background: #ef4444; color: #fff; }
+    .footer { font-size: 12px; color: #94a3b8; margin-top: 24px; border-top: 1px solid #334155; padding-top: 12px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <span class="severity">{{severity}}</span>
+      <h2>🌱 EcoGuard System Alert: {{title}}</h2>
+    </div>
+    <p><strong>Location:</strong> {{location}}</p>
+    <p><strong>Timestamp:</strong> {{timestamp}}</p>
+    <p><strong>Description:</strong> {{description}}</p>
+    <div class="footer">
+      This is an automated high-priority dispatch from EcoGuard AI Early Warning Network.
+    </div>
+  </div>
+</body>
+</html>
