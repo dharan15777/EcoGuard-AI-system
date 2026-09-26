@@ -84,8 +84,8 @@ export const Map: React.FC<MapProps> = ({
     if (onSelectSensor) onSelectSensor(sensor);
   };
 
-  // Center on Pine River Basin
-  const defaultCenter: [number, number] = [37.7700, -122.4250];
+  // Center on Brahmaputra River Basin, Assam, India
+  const defaultCenter: [number, number] = [26.6500, 93.3000];
 
   // Tile layers with 100% free access and NO watermark/API key requirement
   const getTileConfig = () => {
@@ -122,7 +122,7 @@ export const Map: React.FC<MapProps> = ({
       <div className="absolute top-3.5 left-3.5 z-[1000] flex flex-wrap items-center gap-2 pointer-events-auto">
         <div className="bg-slate-950/95 border border-white/15 px-3.5 py-1.5 rounded-lg text-xs font-medium text-slate-200 flex items-center gap-2 shadow-xl backdrop-blur-md">
           <Compass size={15} className="text-cyan-400" />
-          <span className="font-bold text-white tracking-wide">Pine River Basin & Delta Catchment</span>
+          <span className="font-bold text-white tracking-wide">Brahmaputra River Basin · Assam, India</span>
           <span className="text-slate-400">·</span>
           <span className="text-cyan-300 font-semibold">{sensors.length} Active Hydro Nodes</span>
         </div>
@@ -198,7 +198,7 @@ export const Map: React.FC<MapProps> = ({
       <div className="w-full h-full relative z-0">
         <MapContainer
           center={defaultCenter}
-          zoom={12}
+          zoom={8}
           scrollWheelZoom={true}
           style={{ width: '100%', height: '100%', background: '#0a0e12' }}
         >

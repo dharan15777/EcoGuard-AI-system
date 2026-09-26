@@ -51,7 +51,7 @@ export const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
       <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-muted)', letterSpacing: '0.1em' }}>ZONE</div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.9rem', fontWeight: '700', color: '#c4d4bc' }}>BAY-DELTA</div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.9rem', fontWeight: '700', color: '#c4d4bc' }}>ASSAM - BRAHMAPUTRA</div>
         </div>
 
         <div style={{ width: '1px', height: '28px', background: 'var(--border-raw)' }} />

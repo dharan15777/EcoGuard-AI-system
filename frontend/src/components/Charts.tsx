@@ -134,7 +134,7 @@ export const Charts: React.FC<ChartsProps> = ({
             </span>
             <span className="flex items-center gap-1.5 font-medium text-cyan-300">
               <span className="w-3.5 h-1.5 rounded-sm bg-cyan-400 inline-block" />
-              Pine River Hydro Node Alpha Telemetry
+              Brahmaputra Hydro Node Alpha Telemetry
             </span>
           </div>
           <span className="text-slate-400 text-[11px]">30-minute interval readings · Auto-syncing</span>
@@ -263,7 +263,7 @@ export const Charts: React.FC<ChartsProps> = ({
             </span>
             <span className="flex items-center gap-1.5 font-medium text-indigo-300">
               <span className="w-3.5 h-1.5 rounded-sm bg-indigo-400 inline-block" />
-              Pine River Basin Meteorological Station Feed
+              Brahmaputra Basin Meteorological Feed
             </span>
           </div>
           <span className="text-slate-400 text-[11px]">24-Hour Cumulative: 114.2 mm</span>

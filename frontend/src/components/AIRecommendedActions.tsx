@@ -194,7 +194,7 @@ export const AIRecommendedActions: React.FC<AIRecommendedActionsProps> = ({
           <ShieldAlert size={14} className="text-orange-400" />
           Synchronized with District Disaster Management Authority (DDMA) & National Disaster Response Force (NDRF)
         </span>
-        <span className="text-slate-400">Target Zone: Pine River Valley Catchment & Lowland Sector</span>
+        <span className="text-slate-400">Target Zone: Brahmaputra River Basin & Assam Floodplains</span>
       </div>
     </div>
   );
