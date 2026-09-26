@@ -81,19 +81,19 @@ const SignInScreen = ({ onLogin, onGoogleLogin, onForgotPassword, onSwitchToRegi
   const [loading, setLoading] = useState(false);
   const [gLoading,setGLoading]= useState(false);
 
-  /* Field-level error highlighting */
-  const emailErr = error && (error.toLowerCase().includes('email') || error.toLowerCase().includes('account'));
-  const pwErr    = error && error.toLowerCase().includes('password');
+  /* Precise error classification */
+  const isIncorrectEmail = error.toLowerCase().includes('email') || error.toLowerCase().includes('account');
+  const isIncorrectPassword = error.toLowerCase().includes('password');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    if (!email.trim())   { setError('Please enter your email address.'); return; }
-    if (!password)       { setError('Please enter your password.'); return; }
+    if (!email.trim())   { setError('Incorrect email'); return; }
+    if (!password)       { setError('Incorrect password'); return; }
     setLoading(true);
     const res = await onLogin(email.trim(), password);
     setLoading(false);
-    if (!res.success) setError(res.error);
+    if (!res.success) setError(res.error || 'Incorrect email or password');
   };
 
   const handleGoogle = async () => {
@@ -140,9 +140,18 @@ const SignInScreen = ({ onLogin, onGoogleLogin, onForgotPassword, onSwitchToRegi
               autoComplete="email"
               placeholder="you@example.com"
               onChange={e => { setEmail(e.target.value); setError(''); }}
-              style={{ ...inputBase, borderColor: emailErr ? 'rgba(200,64,64,0.6)' : 'rgba(139,163,130,0.2)' }}
+              style={{
+                ...inputBase,
+                borderColor: isIncorrectEmail ? '#e05050' : 'rgba(139,163,130,0.2)',
+                background: isIncorrectEmail ? 'rgba(200,64,64,0.08)' : inputBase.background
+              }}
             />
           </div>
+          {isIncorrectEmail && (
+            <div style={{ fontSize: '0.72rem', color: '#e05050', marginTop: '4px', fontFamily: "'Space Mono', monospace" }}>
+              ⚠ {error}
+            </div>
+          )}
         </div>
 
         {/* Password */}
@@ -162,12 +171,22 @@ const SignInScreen = ({ onLogin, onGoogleLogin, onForgotPassword, onSwitchToRegi
               autoComplete="current-password"
               placeholder="Enter your password"
               onChange={e => { setPassword(e.target.value); setError(''); }}
-              style={{ ...inputBase, paddingRight: '42px', borderColor: pwErr ? 'rgba(200,64,64,0.6)' : 'rgba(139,163,130,0.2)' }}
+              style={{
+                ...inputBase,
+                paddingRight: '42px',
+                borderColor: isIncorrectPassword ? '#e05050' : 'rgba(139,163,130,0.2)',
+                background: isIncorrectPassword ? 'rgba(200,64,64,0.08)' : inputBase.background
+              }}
             />
             <button type="button" onClick={() => setShowPw(p => !p)} style={{ position: 'absolute', right: '11px', top: '50%', transform: 'translateY(-50%)', color: '#4a6040', padding: '4px', background: 'none' }}>
               {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
             </button>
           </div>
+          {isIncorrectPassword && (
+            <div style={{ fontSize: '0.72rem', color: '#e05050', marginTop: '4px', fontFamily: "'Space Mono', monospace" }}>
+              ⚠ {error}
+            </div>
+          )}
         </div>
 
         {error && <ErrorBanner msg={error} />}
@@ -202,15 +221,34 @@ const RegisterScreen = ({ onRegister, onGoogleLogin, onSwitchToLogin }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    if (!name.trim())               { setError('Please enter your full name.'); return; }
-    if (!email.trim())              { setError('Please enter your email address.'); return; }
-    if (password.length < 6)        { setError('Password must be at least 6 characters.'); return; }
-    if (password !== confirmPw)     { setError('Passwords do not match.'); return; }
+    if (!email.trim()) {
+      setError('Please enter your email address.');
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+    if (!password) {
+      setError('Please enter your password.');
+      return;
+    }
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters.');
+      return;
+    }
+    if (confirmPw && password !== confirmPw) {
+      setError('Passwords do not match.');
+      return;
+    }
     setLoading(true);
-    const res = await onRegister(name.trim(), email.trim(), password);
+    const displayName = (name && name.trim()) ? name.trim() : email.trim().split('@')[0];
+    const res = await onRegister(displayName, email.trim(), password);
     setLoading(false);
-    if (!res.success) setError(res.error);
-    // on success, useAuth hook sets user → App auto-navigates to dashboard
+    if (!res?.success) {
+      setError(res?.error || 'Account creation failed. Please try again.');
+    }
   };
 
   const handleGoogle = async () => {
@@ -250,9 +288,9 @@ const RegisterScreen = ({ onRegister, onGoogleLogin, onSwitchToLogin }) => {
       </div>
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        {/* Full name */}
+        {/* Full name (optional) */}
         <div>
-          <label style={labelSt}>Full Name</label>
+          <label style={labelSt}>Full Name <span style={{ textTransform: 'none', color: '#4a6040' }}>(Optional)</span></label>
           <div style={{ position: 'relative' }}>
             <InputIcon><User size={15} /></InputIcon>
             <input
@@ -260,7 +298,7 @@ const RegisterScreen = ({ onRegister, onGoogleLogin, onSwitchToLogin }) => {
               type="text"
               value={name}
               autoComplete="name"
-              placeholder="Dr. Jane Smith"
+              placeholder="e.g. Jane Doe"
               onChange={e => { setName(e.target.value); setError(''); }}
               style={inputBase}
             />
@@ -279,7 +317,7 @@ const RegisterScreen = ({ onRegister, onGoogleLogin, onSwitchToLogin }) => {
               autoComplete="email"
               placeholder="you@example.com"
               onChange={e => { setEmail(e.target.value); setError(''); }}
-              style={{ ...inputBase, borderColor: error && error.includes('email') ? 'rgba(200,64,64,0.6)' : 'rgba(139,163,130,0.2)' }}
+              style={{ ...inputBase, borderColor: error && error.toLowerCase().includes('email') ? '#e05050' : 'rgba(139,163,130,0.2)' }}
             />
           </div>
         </div>
@@ -315,7 +353,7 @@ const RegisterScreen = ({ onRegister, onGoogleLogin, onSwitchToLogin }) => {
 
         {/* Confirm password */}
         <div>
-          <label style={labelSt}>Confirm Password</label>
+          <label style={labelSt}>Confirm Password <span style={{ textTransform: 'none', color: '#4a6040' }}>(Optional)</span></label>
           <div style={{ position: 'relative' }}>
             <InputIcon><Lock size={15} /></InputIcon>
             <input
@@ -323,13 +361,13 @@ const RegisterScreen = ({ onRegister, onGoogleLogin, onSwitchToLogin }) => {
               type={showPw ? 'text' : 'password'}
               value={confirmPw}
               autoComplete="new-password"
-              placeholder="Re-enter password"
+              placeholder="Re-enter password to verify"
               onChange={e => { setConfirmPw(e.target.value); setError(''); }}
-              style={{ ...inputBase, borderColor: confirmPw && confirmPw !== password ? 'rgba(200,64,64,0.6)' : 'rgba(139,163,130,0.2)' }}
+              style={{ ...inputBase, borderColor: confirmPw && confirmPw !== password ? '#e05050' : 'rgba(139,163,130,0.2)' }}
             />
           </div>
           {confirmPw && confirmPw !== password && (
-            <p style={{ fontSize: '0.68rem', color: '#c84040', marginTop: '4px', fontFamily: "'Space Mono', monospace" }}>Passwords do not match</p>
+            <p style={{ fontSize: '0.68rem', color: '#e05050', marginTop: '4px', fontFamily: "'Space Mono', monospace" }}>Passwords do not match</p>
           )}
         </div>
 
@@ -342,7 +380,7 @@ const RegisterScreen = ({ onRegister, onGoogleLogin, onSwitchToLogin }) => {
           style={{ marginTop: '2px', padding: '11px', borderRadius: '7px', background: loading ? 'rgba(90,138,74,0.35)' : 'linear-gradient(135deg, #5a8a4a 0%, #3d6232 100%)', border: '1px solid rgba(90,138,74,0.4)', color: '#e8ede6', fontWeight: '700', fontSize: '0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: loading ? 'not-allowed' : 'pointer', boxShadow: loading ? 'none' : '0 0 16px rgba(90,138,74,0.2)', fontFamily: "'Space Grotesk', sans-serif" }}
         >
           {loading ? <Spinner /> : <UserPlus size={16} />}
-          {loading ? 'Creating account…' : 'Create Account & Sign In'}
+          {loading ? 'Creating account…' : 'Create Account & Access Dashboard'}
         </button>
       </form>
     </div>
@@ -482,7 +520,7 @@ const ResetScreen = ({ email, onBack, onDone }) => {
 ═══════════════════════════════════════════════════════════════════ */
 export const LandingPage = ({ onLogin, onGoogleLogin, onRegister }) => {
   // 'signin' | 'register' | 'forgot' | 'reset'
-  const [screen,     setScreen]     = useState('signin');
+  const [screen,     setScreen]     = useState(() => (authService.hasUsers() ? 'signin' : 'register'));
   const [resetEmail, setResetEmail] = useState('');
 
   return (
@@ -559,6 +597,61 @@ export const LandingPage = ({ onLogin, onGoogleLogin, onRegister }) => {
       {/* ── Right panel: auth form ────────────────────────────────── */}
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '44px 32px', background: '#0e1210', overflowY: 'auto' }}>
         <div style={{ width: '100%', maxWidth: '410px', background: 'rgba(18,25,17,0.95)', border: '1px solid rgba(139,163,130,0.14)', borderRadius: '12px', padding: '34px 30px', boxShadow: '0 24px 60px rgba(0,0,0,0.45)' }}>
+
+          {/* Quick tab toggle between Sign In and Create Account */}
+          {(screen === 'signin' || screen === 'register') && (
+            <div style={{
+              display: 'flex',
+              background: 'rgba(255,255,255,0.04)',
+              borderRadius: '8px',
+              padding: '4px',
+              marginBottom: '20px',
+              border: '1px solid rgba(139,163,130,0.12)'
+            }}>
+              <button
+                type="button"
+                id="tab-signin"
+                onClick={() => setScreen('signin')}
+                style={{
+                  flex: 1,
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  fontSize: '0.82rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  background: screen === 'signin' ? 'linear-gradient(135deg, #5a8a4a 0%, #3d6232 100%)' : 'transparent',
+                  color: screen === 'signin' ? '#e8ede6' : '#728870',
+                  boxShadow: screen === 'signin' ? '0 2px 8px rgba(90,138,74,0.3)' : 'none',
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                id="tab-register"
+                onClick={() => setScreen('register')}
+                style={{
+                  flex: 1,
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  fontSize: '0.82rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  background: screen === 'register' ? 'linear-gradient(135deg, #5a8a4a 0%, #3d6232 100%)' : 'transparent',
+                  color: screen === 'register' ? '#e8ede6' : '#728870',
+                  boxShadow: screen === 'register' ? '0 2px 8px rgba(90,138,74,0.3)' : 'none',
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                Create Account
+              </button>
+            </div>
+          )}
 
           {screen === 'signin'   && <SignInScreen   onLogin={onLogin} onGoogleLogin={onGoogleLogin} onForgotPassword={() => setScreen('forgot')} onSwitchToRegister={() => setScreen('register')} />}
           {screen === 'register' && <RegisterScreen onRegister={onRegister} onGoogleLogin={onGoogleLogin} onSwitchToLogin={() => setScreen('signin')} />}

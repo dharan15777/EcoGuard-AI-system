@@ -33,14 +33,19 @@ const SEED_USERS = [
   },
 ];
 
+/* ── Users store in localStorage ──────────────────────────────────── */
 function loadUsers() {
   try {
     const raw = localStorage.getItem(USERS_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        // Exclude legacy mock seed users so only accounts created by the user exist
+        return parsed.filter(u => u.id !== 'USR-1001' && u.id !== 'USR-1002');
+      }
+    }
   } catch {}
-  // First ever load — seed defaults
-  localStorage.setItem(USERS_KEY, JSON.stringify(SEED_USERS));
-  return SEED_USERS;
+  return [];
 }
 
 function saveUsers(users) {
@@ -70,18 +75,25 @@ const PIN_STORE = {};
 /* ═══════════════════════════════════════════════════════════════════ */
 export const authService = {
 
+  /* ── Check if any registered accounts exist ────────────────────── */
+  hasUsers() {
+    return loadUsers().length > 0;
+  },
+
   /* ── Register new account ──────────────────────────────────────── */
   async register(name, email, password) {
-    await delay(600);
+    await delay(500);
     const users = loadUsers();
-    const exists = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    const cleanEmail = email.trim().toLowerCase();
+    const exists = users.find(u => u.email.toLowerCase() === cleanEmail);
     if (exists) {
       return { success: false, code: 'email_taken', error: 'An account with this email already exists. Please sign in.' };
     }
+    const displayName = (name && name.trim()) ? name.trim() : cleanEmail.split('@')[0];
     const newUser = {
       id: generateId(),
-      name: name.trim(),
-      email: email.trim().toLowerCase(),
+      name: displayName,
+      email: cleanEmail,
       password,
       role: 'FIELD_OPS',
       department: 'Field Operator',
@@ -98,22 +110,23 @@ export const authService = {
 
   /* ── Login ─────────────────────────────────────────────────────── */
   async login(email, password) {
-    await delay(600);
+    await delay(500);
     const users = loadUsers();
-    const user  = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const user = users.find(u => u.email.toLowerCase() === cleanEmail);
 
     if (!user) {
       return {
         success: false,
         code: 'incorrect_email',
-        error: 'No account found with this email address. Please create an account first.',
+        error: 'Incorrect email',
       };
     }
     if (user.password !== password) {
       return {
         success: false,
         code: 'incorrect_password',
-        error: 'Incorrect password. Please try again or reset your password.',
+        error: 'Incorrect password',
       };
     }
     const session = stripPassword(user);
@@ -123,10 +136,23 @@ export const authService = {
 
   /* ── Google mock OAuth ─────────────────────────────────────────── */
   async loginWithGoogle() {
-    await delay(900);
-    // Simulate linking to seed admin account
+    await delay(700);
     const users = loadUsers();
-    const user  = users[0];
+    let user = users.find(u => u.email === 'google.user@ecoguard.ai');
+    if (!user) {
+      user = {
+        id: generateId(),
+        name: 'EcoGuard Specialist',
+        email: 'google.user@ecoguard.ai',
+        role: 'FIELD_OPS',
+        department: 'Field Operator',
+        zone: 'BAY-DELTA',
+        clearance: 'Tier 1 — Basic Access',
+        createdAt: new Date().toISOString(),
+      };
+      users.push(user);
+      saveUsers(users);
+    }
     const session = stripPassword(user);
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
     return { success: true, user: session };

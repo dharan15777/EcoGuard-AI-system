@@ -38,7 +38,7 @@ export function App() {
   const [activePage, setActivePage] = useState('dashboard');
   const { sensors }                 = useSensorData();
   const { alerts, acknowledgeAlert} = useAlerts();
-  const { user, loading, login, loginWithGoogle, logout } = useAuth();
+  const { user, loading, register, login, loginWithGoogle, logout } = useAuth();
 
   // ── While restoring session show a loader ─────────────────────────
   if (loading) return <AppLoader />;
@@ -48,6 +48,7 @@ export function App() {
     return (
       <LandingPage
         onLogin={login}
+        onRegister={register}
         onGoogleLogin={loginWithGoogle}
       />
     );

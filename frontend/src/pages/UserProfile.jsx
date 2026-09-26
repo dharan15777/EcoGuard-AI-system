@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, Shield, Mail, Phone, Building, Key, MapPin, Clock } from 'lucide-react';
+import { User, Shield, Mail, Phone, Building, Key, MapPin, Clock, LogOut } from 'lucide-react';
 
 const InfoBlock = ({ icon: Icon, label, value, color = 'var(--text-primary)' }) => (
   <div style={{
@@ -16,7 +16,7 @@ const InfoBlock = ({ icon: Icon, label, value, color = 'var(--text-primary)' }) 
   </div>
 );
 
-export const UserProfile = ({ user }) => {
+export const UserProfile = ({ user, onLogout }) => {
   return (
     <div style={{ maxWidth: '640px', margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: '18px' }}>
 
@@ -90,6 +90,32 @@ export const UserProfile = ({ user }) => {
             </div>
           ))}
         </div>
+
+        {onLogout && (
+          <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border-raw)' }}>
+            <button
+              onClick={onLogout}
+              style={{
+                width: '100%',
+                padding: '11px',
+                borderRadius: '6px',
+                background: 'rgba(200,64,64,0.12)',
+                border: '1px solid rgba(200,64,64,0.3)',
+                color: '#e05050',
+                fontSize: '0.86rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <LogOut size={15} /> Sign Out of EcoGuard
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
