@@ -1,7 +1,7 @@
 import React from 'react';
 import { FloodRiskTier } from '../types/flood';
 import { RISK_COLORS } from '../utils/floodConstants';
-import { AlertTriangle, ShieldCheck, ShieldAlert, ArrowUpRight, TrendingUp } from 'lucide-react';
+import { AlertTriangle, ShieldCheck, ShieldAlert, TrendingUp, Info, Activity } from 'lucide-react';
 
 interface FloodGaugeProps {
   score: number; // 0 to 100
@@ -18,24 +18,21 @@ export const FloodGauge: React.FC<FloodGaugeProps> = ({
 }) => {
   const currentRisk = RISK_COLORS[tier] || RISK_COLORS.SAFE;
 
-  // Gauge geometry: Semi-circle from -180 deg to 0 deg (or -210 to +30)
-  // Let's use an arc radius of 130, center at (175, 160)
-  const radius = 120;
-  const strokeWidth = 16;
-  const cx = 175;
-  const cy = 165;
+  // Arc geometry
+  const radius = 135;
+  const strokeWidth = 18;
+  const cx = 200;
+  const cy = 180;
 
-  // Angle ranges: -180 deg (left, 0 score) to 0 deg (right, 100 score)
   const scoreClamped = Math.min(100, Math.max(0, score));
   const angleDeg = -180 + (scoreClamped / 100) * 180;
   const angleRad = (angleDeg * Math.PI) / 180;
 
   // Needle tip
-  const needleLength = 95;
+  const needleLength = 110;
   const needleX = cx + needleLength * Math.cos(angleRad);
   const needleY = cy + needleLength * Math.sin(angleRad);
 
-  // SVG Arc generator
   const createArc = (startFrac: number, endFrac: number) => {
     const startAng = -Math.PI + startFrac * Math.PI;
     const endAng = -Math.PI + endFrac * Math.PI;
@@ -47,190 +44,212 @@ export const FloodGauge: React.FC<FloodGaugeProps> = ({
   };
 
   return (
-    <div className="field-panel relative overflow-hidden p-6 flex flex-col items-center justify-between"
+    <div
+      className="field-panel p-6 rounded-xl relative overflow-hidden"
       style={{
-        background: 'linear-gradient(170deg, rgba(20,26,20,0.95) 0%, rgba(14,18,14,0.98) 100%)',
-        boxShadow: tier === 'DANGER' ? '0 0 30px rgba(239, 68, 68, 0.18)' : '0 4px 20px rgba(0,0,0,0.4)',
-        borderColor: tier === 'DANGER' ? 'rgba(239, 68, 68, 0.4)' : 'var(--border-raw)'
+        background: 'linear-gradient(160deg, rgba(15,23,42,0.95) 0%, rgba(10,15,26,0.98) 100%)',
+        border: tier === 'DANGER' ? '1px solid rgba(239, 68, 68, 0.45)' : '1px solid rgba(255,255,255,0.1)',
+        boxShadow: tier === 'DANGER' ? '0 10px 30px rgba(239, 68, 68, 0.15)' : '0 8px 24px rgba(0,0,0,0.35)'
       }}
     >
-      {/* Top Title & Status */}
-      <div className="w-full flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <div className="w-2.5 h-2.5 rounded-full animate-ping" style={{ background: currentRisk.color }} />
-          <span className="text-xs font-mono font-bold tracking-wider uppercase text-zinc-400">
-            Flood Risk Indicator
-          </span>
+      {/* Section Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6 pb-4 border-b border-white/10">
+        <div className="flex items-center gap-3">
+          <div
+            className="w-10 h-10 rounded-lg flex items-center justify-center shadow-md"
+            style={{ background: currentRisk.bg, border: `1px solid ${currentRisk.border}` }}
+          >
+            <Activity size={22} color={currentRisk.color} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-cyan-400">
+                SECTION 2 · COMPREHENSIVE FLOOD RISK ASSESSMENT
+              </span>
+            </div>
+            <h2 className="text-xl font-bold text-white tracking-tight">
+              Flood Risk Severity Indicator & Visual Gauge
+            </h2>
+          </div>
         </div>
+
+        {/* Current Risk Badge */}
         <div
-          className="px-2.5 py-1 rounded-full text-xs font-mono font-bold tracking-wide flex items-center gap-1.5 shadow-sm"
+          className="px-4 py-1.5 rounded-full text-xs font-bold tracking-wide flex items-center gap-2 shadow-sm"
           style={{
             background: currentRisk.bg,
             color: currentRisk.text,
-            border: `1px solid ${currentRisk.border}`
+            border: `1.5px solid ${currentRisk.border}`
           }}
         >
-          {tier === 'DANGER' ? <ShieldAlert size={14} /> : tier === 'SAFE' ? <ShieldCheck size={14} /> : <AlertTriangle size={14} />}
-          {currentRisk.name.toUpperCase()} RISK
+          {tier === 'DANGER' ? <ShieldAlert size={16} /> : tier === 'SAFE' ? <ShieldCheck size={16} /> : <AlertTriangle size={16} />}
+          STATUS: {currentRisk.name.toUpperCase()} RISK TIER
         </div>
       </div>
 
-      {/* Large SVG Gauge */}
-      <div className="relative w-full max-w-[350px] flex justify-center items-center py-1">
-        <svg
-          viewBox="0 0 350 205"
-          className="w-full h-auto overflow-visible select-none"
-        >
-          <defs>
-            {/* Glow filters for needle and active zones */}
-            <filter id="gauge-glow" x="-20%" y="-20%" width="140%" height="140%">
-              <feGaussianBlur stdDeviation="4" result="blur" />
-              <feComposite in="SourceGraphic" in2="blur" operator="over" />
-            </filter>
-            <linearGradient id="needle-gradient" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor="#ffffff" />
-              <stop offset="100%" stopColor={currentRisk.color} />
-            </linearGradient>
-          </defs>
+      {/* Main Gauge & Matrix Layout: 2 Columns for maximum clarity */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+        {/* Left: Large Visual Gauge (6 cols) */}
+        <div className="lg:col-span-6 flex flex-col items-center justify-center p-4 bg-slate-900/60 rounded-xl border border-white/5 relative">
+          <svg viewBox="0 0 400 230" className="w-full max-w-[420px] h-auto overflow-visible select-none">
+            <defs>
+              <filter id="gauge-glow-v2" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="5" result="blur" />
+                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+              </filter>
+            </defs>
 
-          {/* Background track */}
-          <path
-            d={createArc(0, 1)}
-            fill="none"
-            stroke="rgba(255, 255, 255, 0.08)"
-            strokeWidth={strokeWidth + 4}
-            strokeLinecap="round"
-          />
+            {/* Background track */}
+            <path
+              d={createArc(0, 1)}
+              fill="none"
+              stroke="rgba(255, 255, 255, 0.08)"
+              strokeWidth={strokeWidth + 6}
+              strokeLinecap="round"
+            />
 
-          {/* 4 Colored Risk Zone Arcs */}
-          {/* Safe (0 - 25%): Green */}
-          <path
-            d={createArc(0.01, 0.245)}
-            fill="none"
-            stroke="#10b981"
-            strokeWidth={strokeWidth}
-            opacity={tier === 'SAFE' ? 1 : 0.45}
-            strokeLinecap="round"
-          />
-          {/* Watch (25 - 50%): Yellow */}
-          <path
-            d={createArc(0.26, 0.495)}
-            fill="none"
-            stroke="#f59e0b"
-            strokeWidth={strokeWidth}
-            opacity={tier === 'WATCH' ? 1 : 0.45}
-          />
-          {/* Warning (50 - 75%): Orange */}
-          <path
-            d={createArc(0.51, 0.745)}
-            fill="none"
-            stroke="#f97316"
-            strokeWidth={strokeWidth}
-            opacity={tier === 'WARNING' ? 1 : 0.45}
-          />
-          {/* Danger (75 - 100%): Red */}
-          <path
-            d={createArc(0.76, 0.99)}
-            fill="none"
-            stroke="#ef4444"
-            strokeWidth={strokeWidth}
-            opacity={tier === 'DANGER' ? 1 : 0.45}
-            strokeLinecap="round"
-            filter={tier === 'DANGER' ? 'url(#gauge-glow)' : undefined}
-          />
+            {/* 4 Color Zones */}
+            {/* Green = Safe (0 - 25) */}
+            <path
+              d={createArc(0.01, 0.245)}
+              fill="none"
+              stroke="#10b981"
+              strokeWidth={strokeWidth}
+              opacity={tier === 'SAFE' ? 1 : 0.4}
+              strokeLinecap="round"
+            />
+            {/* Yellow = Watch (25 - 50) */}
+            <path
+              d={createArc(0.26, 0.495)}
+              fill="none"
+              stroke="#f59e0b"
+              strokeWidth={strokeWidth}
+              opacity={tier === 'WATCH' ? 1 : 0.4}
+            />
+            {/* Orange = Warning (50 - 75) */}
+            <path
+              d={createArc(0.51, 0.745)}
+              fill="none"
+              stroke="#f97316"
+              strokeWidth={strokeWidth}
+              opacity={tier === 'WARNING' ? 1 : 0.4}
+            />
+            {/* Red = Danger (75 - 100) */}
+            <path
+              d={createArc(0.76, 0.99)}
+              fill="none"
+              stroke="#ef4444"
+              strokeWidth={strokeWidth}
+              opacity={tier === 'DANGER' ? 1 : 0.4}
+              strokeLinecap="round"
+              filter={tier === 'DANGER' ? 'url(#gauge-glow-v2)' : undefined}
+            />
 
-          {/* Inner Accent Ring */}
-          <path
-            d={createArc(0, 1)}
-            fill="none"
-            stroke="rgba(255,255,255,0.04)"
-            strokeWidth="2"
-            strokeDasharray="3 3"
-          />
+            {/* Scale Numerics */}
+            <text x="35" y="200" fill="#10b981" fontSize="12" fontWeight="700">0</text>
+            <text x="85" y="105" fill="#f59e0b" fontSize="12" fontWeight="600">25</text>
+            <text x="200" y="45" textAnchor="middle" fill="#f97316" fontSize="13" fontWeight="700">50</text>
+            <text x="310" y="105" fill="#ef4444" fontSize="12" fontWeight="600">75</text>
+            <text x="355" y="200" fill="#ef4444" fontSize="12" fontWeight="700">100</text>
 
-          {/* Scale Labels */}
-          <text x="32" y="180" fill="#10b981" fontSize="10" fontFamily="var(--font-mono)" fontWeight="700">0</text>
-          <text x="75" y="95" fill="#f59e0b" fontSize="10" fontFamily="var(--font-mono)" fontWeight="600">25</text>
-          <text x="175" y="45" textAnchor="middle" fill="#f97316" fontSize="11" fontFamily="var(--font-mono)" fontWeight="700">50</text>
-          <text x="270" y="95" fill="#ef4444" fontSize="10" fontFamily="var(--font-mono)" fontWeight="600">75</text>
-          <text x="312" y="180" fill="#ef4444" fontSize="10" fontFamily="var(--font-mono)" fontWeight="700">100</text>
+            {/* Needle Line */}
+            <line
+              x1={cx}
+              y1={cy}
+              x2={needleX}
+              y2={needleY}
+              stroke={currentRisk.color}
+              strokeWidth="4"
+              strokeLinecap="round"
+              filter="url(#gauge-glow-v2)"
+            />
+            <line
+              x1={cx}
+              y1={cy}
+              x2={needleX}
+              y2={needleY}
+              stroke="#ffffff"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
 
-          {/* Needle Base & Needle */}
-          {/* Glowing trajectory line */}
-          <line
-            x1={cx}
-            y1={cy}
-            x2={needleX}
-            y2={needleY}
-            stroke={currentRisk.color}
-            strokeWidth="3.5"
-            strokeLinecap="round"
-            filter="url(#gauge-glow)"
-          />
-          <line
-            x1={cx}
-            y1={cy}
-            x2={needleX}
-            y2={needleY}
-            stroke="#ffffff"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          />
+            {/* Center Hub */}
+            <circle cx={cx} cy={cy} r="16" fill="#0b0f19" stroke={currentRisk.color} strokeWidth="3.5" />
+            <circle cx={cx} cy={cy} r="7" fill={currentRisk.color} />
+          </svg>
 
-          {/* Center Hub */}
-          <circle cx={cx} cy={cy} r="14" fill="#0d130e" stroke={currentRisk.color} strokeWidth="3" />
-          <circle cx={cx} cy={cy} r="6" fill={currentRisk.color} />
-        </svg>
-
-        {/* Digital Readout In Center Overlay */}
-        <div className="absolute bottom-2 flex flex-col items-center">
-          <div className="flex items-baseline gap-1">
-            <span
-              className="text-4xl md:text-5xl font-mono font-black tracking-tight drop-shadow-md"
-              style={{ color: currentRisk.text }}
-            >
-              {score}
-            </span>
-            <span className="text-zinc-500 font-mono text-sm font-semibold">/100</span>
-          </div>
-          <span className="text-[11px] font-mono tracking-wider uppercase text-zinc-400 font-semibold -mt-1">
-            Hazard Severity Index
-          </span>
-        </div>
-      </div>
-
-      {/* Bottom Risk Color Legend & Metrics */}
-      <div className="w-full mt-3 pt-3 border-t border-white/10 flex flex-col gap-2.5">
-        {/* Color Indicators Legend */}
-        <div className="grid grid-cols-4 gap-2 text-center text-[10px] font-mono font-bold">
-          <div className={`p-1.5 rounded border transition-all ${tier === 'SAFE' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 ring-1 ring-emerald-500/50' : 'bg-black/30 border-white/5 text-zinc-400'}`}>
-            <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 mr-1 align-middle" />
-            SAFE
-          </div>
-          <div className={`p-1.5 rounded border transition-all ${tier === 'WATCH' ? 'bg-amber-500/20 border-amber-500 text-amber-300 ring-1 ring-amber-500/50' : 'bg-black/30 border-white/5 text-zinc-400'}`}>
-            <span className="inline-block w-2 h-2 rounded-full bg-amber-400 mr-1 align-middle" />
-            WATCH
-          </div>
-          <div className={`p-1.5 rounded border transition-all ${tier === 'WARNING' ? 'bg-orange-500/20 border-orange-500 text-orange-300 ring-1 ring-orange-500/50' : 'bg-black/30 border-white/5 text-zinc-400'}`}>
-            <span className="inline-block w-2 h-2 rounded-full bg-orange-400 mr-1 align-middle" />
-            WARN
-          </div>
-          <div className={`p-1.5 rounded border transition-all ${tier === 'DANGER' ? 'bg-red-500/20 border-red-500 text-red-300 ring-1 ring-red-500/50' : 'bg-black/30 border-white/5 text-zinc-400'}`}>
-            <span className="inline-block w-2 h-2 rounded-full bg-red-400 mr-1 align-middle animate-pulse" />
-            DANGER
+          {/* Central Digital Readout */}
+          <div className="text-center -mt-8 mb-2">
+            <div className="flex items-baseline justify-center gap-1">
+              <span className="text-5xl lg:text-6xl font-black tracking-tight" style={{ color: currentRisk.text }}>
+                {score}
+              </span>
+              <span className="text-slate-400 font-bold text-lg">/ 100</span>
+            </div>
+            <div className="text-xs uppercase font-bold tracking-wider text-slate-300 mt-1">
+              Flood Severity Index
+            </div>
           </div>
         </div>
 
-        {/* Telemetry sub-metrics */}
-        <div className="flex items-center justify-between text-xs font-mono text-zinc-400 bg-black/25 px-3 py-2 rounded border border-white/5">
-          <div className="flex items-center gap-1.5">
-            <TrendingUp size={13} className="text-cyan-400" />
-            <span>Rate of Rise:</span>
-            <span className="text-cyan-300 font-bold">+{rateOfRise.toFixed(2)} m/hr</span>
+        {/* Right: Risk Threshold Matrix & Telemetry Breakdown (6 cols) */}
+        <div className="lg:col-span-6 flex flex-col justify-between gap-4">
+          {/* Telemetry Stats */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3.5 rounded-xl bg-slate-900/80 border border-white/10">
+              <span className="text-xs text-slate-400 font-medium">Telemetry Rate of Rise</span>
+              <div className="text-xl font-bold text-cyan-400 flex items-center gap-1.5 mt-1">
+                <TrendingUp size={18} /> +{rateOfRise.toFixed(2)} m/hr
+              </div>
+              <span className="text-[11px] text-slate-400 mt-0.5 block">Rapid catchment inflow</span>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-slate-900/80 border border-white/10">
+              <span className="text-xs text-slate-400 font-medium">Current River Stage</span>
+              <div className="text-xl font-bold text-white mt-1">
+                {waterLevel.toFixed(2)} meters
+              </div>
+              <span className="text-[11px] text-red-400 mt-0.5 block font-semibold">Exceeds Danger Limit (4.20m)</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span>Stage:</span>
-            <span className="text-white font-bold">{waterLevel.toFixed(2)}m</span>
+
+          {/* Color-Coded Risk Level Definitions */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <div className={`p-3 rounded-lg border text-center transition-all ${tier === 'SAFE' ? 'bg-emerald-500/20 border-emerald-500 ring-2 ring-emerald-500/40' : 'bg-slate-900/50 border-white/10'}`}>
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block mb-1" />
+              <div className="text-xs font-bold text-emerald-400">SAFE</div>
+              <div className="text-[11px] text-slate-400 font-mono">0 – 25</div>
+              <div className="text-[10px] text-slate-400 mt-1">Nominal flow</div>
+            </div>
+
+            <div className={`p-3 rounded-lg border text-center transition-all ${tier === 'WATCH' ? 'bg-amber-500/20 border-amber-500 ring-2 ring-amber-500/40' : 'bg-slate-900/50 border-white/10'}`}>
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block mb-1" />
+              <div className="text-xs font-bold text-amber-400">WATCH</div>
+              <div className="text-[11px] text-slate-400 font-mono">26 – 50</div>
+              <div className="text-[10px] text-slate-400 mt-1">Rising levels</div>
+            </div>
+
+            <div className={`p-3 rounded-lg border text-center transition-all ${tier === 'WARNING' ? 'bg-orange-500/20 border-orange-500 ring-2 ring-orange-500/40' : 'bg-slate-900/50 border-white/10'}`}>
+              <span className="w-2.5 h-2.5 rounded-full bg-orange-400 inline-block mb-1" />
+              <div className="text-xs font-bold text-orange-400">WARNING</div>
+              <div className="text-[11px] text-slate-400 font-mono">51 – 75</div>
+              <div className="text-[10px] text-slate-400 mt-1">Overbank risk</div>
+            </div>
+
+            <div className={`p-3 rounded-lg border text-center transition-all ${tier === 'DANGER' ? 'bg-red-500/20 border-red-500 ring-2 ring-red-500/40' : 'bg-slate-900/50 border-white/10'}`}>
+              <span className="w-2.5 h-2.5 rounded-full bg-red-400 animate-pulse inline-block mb-1" />
+              <div className="text-xs font-bold text-red-400">DANGER</div>
+              <div className="text-[11px] text-slate-400 font-mono">76 – 100</div>
+              <div className="text-[10px] text-slate-400 mt-1">Severe inundation</div>
+            </div>
+          </div>
+
+          {/* Operational Advisory summary */}
+          <div className="p-3.5 rounded-xl bg-slate-900/80 border border-white/10 flex items-start gap-3">
+            <Info size={18} className="text-cyan-400 flex-shrink-0 mt-0.5" />
+            <div className="text-xs text-slate-300 leading-relaxed">
+              <strong>Active Emergency Threshold:</strong> Hydrostatic stage sensor reports water level at <strong>{waterLevel.toFixed(2)}m</strong> with a flood risk score of <strong>{score}/100</strong>. Disaster management protocols recommend immediate Phase-2 mitigation and barrier deployment.
+            </div>
           </div>
         </div>
       </div>

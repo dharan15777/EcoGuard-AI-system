@@ -11,7 +11,8 @@ import {
   Send,
   Sparkles,
   Layers,
-  ArrowRight
+  ArrowRight,
+  ShieldCheck
 } from 'lucide-react';
 
 interface AIRecommendedActionsProps {
@@ -28,7 +29,6 @@ export const AIRecommendedActions: React.FC<AIRecommendedActionsProps> = ({
   const [actionsList, setActionsList] = useState<AIRecommendedAction[]>(initialActions);
   const [dispatchedId, setDispatchedId] = useState<string | null>(null);
 
-  // Sync if props update
   React.useEffect(() => {
     setActionsList(initialActions);
   }, [initialActions]);
@@ -41,14 +41,14 @@ export const AIRecommendedActions: React.FC<AIRecommendedActionsProps> = ({
       );
       setDispatchedId(null);
       if (onExecuteAction) onExecuteAction(id);
-    }, 600);
+    }, 500);
   };
 
   const getPriorityStyle = (priority: AIRecommendedAction['priority']) => {
     switch (priority) {
       case 'CRITICAL_NOW':
         return {
-          badge: 'bg-red-500/20 text-red-300 border-red-500/40 animate-pulse',
+          badge: 'bg-red-500/20 text-red-300 border-red-500/40',
           label: 'IMMEDIATE DISPATCH',
           border: 'border-l-4 border-l-red-500'
         };
@@ -76,52 +76,60 @@ export const AIRecommendedActions: React.FC<AIRecommendedActionsProps> = ({
   const getCategoryIcon = (category: AIRecommendedAction['category']) => {
     switch (category) {
       case 'Evacuation':
-        return <Users size={16} className="text-red-400" />;
+        return <Users size={18} className="text-red-400" />;
       case 'Infrastructure':
-        return <AlertOctagon size={16} className="text-amber-400" />;
+        return <AlertOctagon size={18} className="text-amber-400" />;
       case 'Authority':
-        return <PhoneCall size={16} className="text-cyan-400" />;
+        return <PhoneCall size={18} className="text-cyan-400" />;
       case 'Livestock':
-        return <Truck size={16} className="text-yellow-400" />;
+        return <Truck size={18} className="text-yellow-400" />;
       case 'Barriers':
-        return <Layers size={16} className="text-emerald-400" />;
+        return <Layers size={18} className="text-emerald-400" />;
       default:
-        return <LifeBuoy size={16} className="text-cyan-400" />;
+        return <LifeBuoy size={18} className="text-cyan-400" />;
     }
   };
 
   return (
     <div
-      className="field-panel p-6 flex flex-col justify-between"
+      className="field-panel p-6 rounded-xl flex flex-col justify-between"
       style={{
-        background: 'linear-gradient(150deg, rgba(20,24,20,0.96) 0%, rgba(14,17,14,0.98) 100%)',
-        border: '1px solid var(--border-raw)',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.35)'
+        background: 'linear-gradient(160deg, rgba(15,23,42,0.95) 0%, rgba(10,15,26,0.98) 100%)',
+        border: '1px solid rgba(56,189,248,0.25)',
+        boxShadow: '0 8px 24px rgba(0,0,0,0.35)'
       }}
     >
-      {/* Title */}
-      <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-orange-950/40 border border-orange-500/30 flex items-center justify-center text-orange-400">
-            <Sparkles size={18} />
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6 pb-4 border-b border-white/10">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-orange-950/60 border border-orange-500/40 flex items-center justify-center text-orange-400">
+            <Sparkles size={22} />
           </div>
           <div>
-            <h3 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
-              AI Recommended Tactical Actions
-            </h3>
-            <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider">
-              Autonomous Disaster Management Protocols · {riskTier} Phase
-            </span>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-orange-400">
+              SECTION 8 · AUTONOMOUS EMERGENCY DISASTER PROTOCOLS
+            </div>
+            <h2 className="text-xl font-bold text-white tracking-tight">
+              AI Recommended Tactical Actions ({riskTier} Phase)
+            </h2>
           </div>
         </div>
 
-        <span className="text-xs font-mono font-semibold px-2.5 py-1 rounded bg-black/40 border border-white/10 text-zinc-300">
-          {actionsList.filter(a => a.status === 'DISPATCHED').length} / {actionsList.length} Executed
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-900 border border-white/10 text-slate-300">
+            {actionsList.filter(a => a.status === 'DISPATCHED').length} of {actionsList.length} Protocols Dispatched
+          </span>
+          <button
+            onClick={() => setActionsList(prev => prev.map(a => ({ ...a, status: 'DISPATCHED' })))}
+            className="text-xs font-bold text-cyan-300 bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500/40 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5"
+          >
+            <Send size={13} /> Dispatch All Protocols
+          </button>
+        </div>
       </div>
 
-      {/* Action Cards List */}
-      <div className="flex flex-col gap-3 max-h-[380px] overflow-y-auto pr-1">
+      {/* Grid of Action Cards across full width */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {actionsList.map((action) => {
           const style = getPriorityStyle(action.priority);
           const isDone = action.status === 'DISPATCHED' || action.status === 'COMPLETED';
@@ -130,71 +138,63 @@ export const AIRecommendedActions: React.FC<AIRecommendedActionsProps> = ({
           return (
             <div
               key={action.id}
-              className={`p-3.5 rounded-lg bg-black/35 border border-white/5 transition-all ${style.border} flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-white/20`}
+              className={`p-4 rounded-xl bg-slate-900/70 border border-white/10 transition-all ${style.border} flex flex-col justify-between hover:border-white/20`}
             >
-              <div className="flex items-start gap-3 flex-1">
-                <div className="p-2 rounded bg-black/40 border border-white/10 flex-shrink-0 mt-0.5">
-                  {getCategoryIcon(action.category)}
-                </div>
-                <div className="flex-1">
-                  <div className="flex flex-wrap items-center gap-2 mb-1">
-                    <span className={`text-[9px] font-mono font-bold uppercase px-2 py-0.5 rounded border ${style.badge}`}>
-                      {style.label}
-                    </span>
-                    <span className="text-[10px] font-mono text-zinc-400 uppercase">
-                      {action.category}
-                    </span>
+              <div>
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-lg bg-slate-950 border border-white/10">
+                      {getCategoryIcon(action.category)}
+                    </div>
+                    <div>
+                      <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${style.badge}`}>
+                        {style.label}
+                      </span>
+                      <span className="text-[11px] text-slate-400 font-semibold ml-2">
+                        {action.category} Protocol
+                      </span>
+                    </div>
                   </div>
-                  <h4 className="text-sm font-bold text-white leading-snug">
-                    {action.title}
-                  </h4>
-                  <p className="text-xs text-zinc-300 mt-1 leading-relaxed">
-                    {action.description}
-                  </p>
+
+                  {isDone ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold text-emerald-400 bg-emerald-500/15 border border-emerald-500/30">
+                      <CheckCircle2 size={13} /> EXECUTED
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => handleActionClick(action.id)}
+                      disabled={isProcessing}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 active:scale-95 border border-cyan-400/40 transition-all shadow-sm"
+                    >
+                      {isProcessing ? 'SENDING...' : <><Send size={12} /> EXECUTE</>}
+                    </button>
+                  )}
                 </div>
+
+                <h3 className="text-sm font-bold text-white leading-snug mt-1">
+                  {action.title}
+                </h3>
+                <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                  {action.description}
+                </p>
               </div>
 
-              {/* Action Button */}
-              <div className="flex-shrink-0 sm:self-center pl-10 sm:pl-0">
-                {isDone ? (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold text-emerald-400 bg-emerald-500/15 border border-emerald-500/30">
-                    <CheckCircle2 size={14} /> EXECUTED
-                  </span>
-                ) : (
-                  <button
-                    onClick={() => handleActionClick(action.id)}
-                    disabled={isProcessing}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold text-white bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 active:scale-95 border border-cyan-400/40 shadow-sm transition-all duration-150 disabled:opacity-50"
-                  >
-                    {isProcessing ? (
-                      'DISPATCHING...'
-                    ) : (
-                      <>
-                        <Send size={13} /> EXECUTE
-                      </>
-                    )}
-                  </button>
-                )}
+              <div className="mt-3 pt-2.5 border-t border-white/5 flex items-center justify-between text-[11px] text-slate-400">
+                <span>Protocol ID: <strong className="text-slate-300 font-mono">{action.id}</strong></span>
+                <span className="text-cyan-400 font-medium">CAP XML & SMS Automated</span>
               </div>
             </div>
           );
         })}
       </div>
 
-      {/* Footer Dispatch Banner */}
-      <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-between text-[11px] font-mono text-zinc-400">
+      {/* Footer Banner */}
+      <div className="mt-4 pt-3 border-t border-white/10 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
         <span className="flex items-center gap-1.5">
-          <ShieldAlert size={13} className="text-orange-400" />
-          Protocols synchronized with State Emergency Operations Center (SEOC)
+          <ShieldAlert size={14} className="text-orange-400" />
+          Synchronized with District Disaster Management Authority (DDMA) & National Disaster Response Force (NDRF)
         </span>
-        <button
-          onClick={() => {
-            setActionsList(prev => prev.map(a => ({ ...a, status: 'DISPATCHED' })));
-          }}
-          className="text-cyan-400 hover:text-cyan-300 font-bold flex items-center gap-1 underline underline-offset-2"
-        >
-          Execute All Pending Protocols <ArrowRight size={12} />
-        </button>
+        <span className="text-slate-400">Target Zone: Pine River Valley Catchment & Lowland Sector</span>
       </div>
     </div>
   );

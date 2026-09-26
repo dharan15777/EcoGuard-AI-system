@@ -1,10 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   ResponsiveContainer,
   AreaChart,
   Area,
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -12,7 +10,7 @@ import {
   ReferenceLine
 } from 'recharts';
 import { HistoricalReading } from '../types/flood';
-import { Waves, CloudRain, Activity, Maximize2, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Waves, CloudRain, Activity, TrendingUp, AlertTriangle } from 'lucide-react';
 
 interface ChartsProps {
   historicalData: HistoricalReading[];
@@ -27,9 +25,6 @@ export const Charts: React.FC<ChartsProps> = ({
   warningThreshold = 3.50,
   heavyRainThreshold = 35.0
 }) => {
-  const [activeTab, setActiveTab] = useState<'both' | 'water' | 'rainfall'>('both');
-
-  // Latest readings
   const latest = historicalData[historicalData.length - 1] || {
     waterLevel: 4.82,
     rainfall: 48.5,
@@ -40,27 +35,20 @@ export const Charts: React.FC<ChartsProps> = ({
   const minWater = Math.min(...historicalData.map(d => d.waterLevel), 1.0);
   const maxRain = Math.max(...historicalData.map(d => d.rainfall), heavyRainThreshold + 10);
 
-  // Custom Dark Tooltip for Water Level
+  // Custom sleek tooltip for Water Level
   const WaterCustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       const val = payload[0].value;
       const isDanger = val >= floodThreshold;
-      const isWarn = val >= warningThreshold && !isDanger;
-
       return (
-        <div className="bg-zinc-950/95 border border-cyan-500/40 p-3 rounded-lg shadow-xl backdrop-blur-md font-mono text-xs">
-          <div className="text-zinc-400 mb-1 border-b border-white/10 pb-1 flex justify-between gap-4">
-            <span>TIMESTAMP:</span>
-            <strong className="text-white">{label}</strong>
+        <div className="bg-slate-950/95 border border-cyan-500/50 p-3 rounded-lg shadow-xl backdrop-blur-md text-xs">
+          <div className="text-slate-400 font-mono text-[11px] mb-1">TIME: {label}</div>
+          <div className="text-base font-bold text-cyan-300 font-mono">
+            {val.toFixed(2)} meters
           </div>
-          <div className="flex items-center justify-between gap-4 my-1">
-            <span className="text-cyan-400 font-semibold">STAGE HEIGHT:</span>
-            <span className="text-base font-bold text-white">{val.toFixed(2)} m</span>
-          </div>
-          <div className="flex items-center justify-between gap-4 text-[10px] mt-1 pt-1 border-t border-white/5">
-            <span>DELTA VS FLOOD STAGE:</span>
-            <span className={val >= floodThreshold ? 'text-red-400 font-bold' : 'text-emerald-400'}>
-              {val >= floodThreshold ? `+${(val - floodThreshold).toFixed(2)}m (EXCEEDED)` : `-${(floodThreshold - val).toFixed(2)}m (CLEAR)`}
+          <div className="text-[11px] mt-1 pt-1 border-t border-white/10 font-medium">
+            <span className={isDanger ? 'text-red-400 font-bold' : 'text-emerald-400'}>
+              {isDanger ? `▲ +${(val - floodThreshold).toFixed(2)}m (Danger Exceeded)` : `▼ -${(floodThreshold - val).toFixed(2)}m (Within Limit)`}
             </span>
           </div>
         </div>
@@ -69,27 +57,18 @@ export const Charts: React.FC<ChartsProps> = ({
     return null;
   };
 
-  // Custom Dark Tooltip for Rainfall
+  // Custom sleek tooltip for Rainfall
   const RainCustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       const val = payload[0].value;
-      const isHeavy = val >= heavyRainThreshold;
-
       return (
-        <div className="bg-zinc-950/95 border border-indigo-500/40 p-3 rounded-lg shadow-xl backdrop-blur-md font-mono text-xs">
-          <div className="text-zinc-400 mb-1 border-b border-white/10 pb-1 flex justify-between gap-4">
-            <span>TIMESTAMP:</span>
-            <strong className="text-white">{label}</strong>
+        <div className="bg-slate-950/95 border border-indigo-500/50 p-3 rounded-lg shadow-xl backdrop-blur-md text-xs">
+          <div className="text-slate-400 font-mono text-[11px] mb-1">TIME: {label}</div>
+          <div className="text-base font-bold text-indigo-300 font-mono">
+            {val.toFixed(1)} mm/hr
           </div>
-          <div className="flex items-center justify-between gap-4 my-1">
-            <span className="text-indigo-400 font-semibold">PRECIPITATION RATE:</span>
-            <span className="text-base font-bold text-white">{val.toFixed(1)} mm/hr</span>
-          </div>
-          <div className="flex items-center justify-between gap-4 text-[10px] mt-1 pt-1 border-t border-white/5">
-            <span>INTENSITY TIER:</span>
-            <span className={isHeavy ? 'text-red-400 font-bold' : val > 15 ? 'text-orange-400' : 'text-emerald-400'}>
-              {val >= 40 ? 'TORRENTIAL MONSOON' : val >= 25 ? 'HEAVY DOWNPOUR' : val >= 10 ? 'MODERATE RAIN' : 'LIGHT PRECIPITATION'}
-            </span>
+          <div className="text-[11px] mt-1 pt-1 border-t border-white/10 text-slate-300 font-medium">
+            {val >= 35 ? 'Torrential Downpour' : val >= 20 ? 'Heavy Precipitation' : 'Moderate Inflow'}
           </div>
         </div>
       );
@@ -98,301 +77,252 @@ export const Charts: React.FC<ChartsProps> = ({
   };
 
   return (
-    <div className="flex flex-col gap-5">
-      {/* Header and Filter Selector */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-1">
-        <div>
-          <div className="text-[10px] font-mono tracking-wider uppercase text-cyan-400 font-semibold flex items-center gap-1.5">
-            <Activity size={13} /> Hydrological Real-Time Telemetry Trends
+    <div className="flex flex-col gap-6 w-full">
+      {/* ========================================================
+          SECTION 4: WATER LEVEL TREND CHART (FULL WIDTH)
+         ======================================================== */}
+      <div
+        className="field-panel p-6 rounded-xl flex flex-col justify-between"
+        style={{
+          background: 'linear-gradient(160deg, rgba(15,23,42,0.95) 0%, rgba(10,15,26,0.98) 100%)',
+          border: '1px solid rgba(56,189,248,0.25)',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.35)'
+        }}
+      >
+        {/* Section Header */}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-cyan-950/70 border border-cyan-500/40 flex items-center justify-center text-cyan-400">
+              <Waves size={22} />
+            </div>
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-wider text-cyan-400">
+                SECTION 4 · HYDROLOGICAL STAGE TELEMETRY
+              </div>
+              <h2 className="text-xl font-bold text-white tracking-tight">
+                Water Level Trend Chart & Inundation Stage History
+              </h2>
+            </div>
           </div>
-          <h3 className="text-lg font-bold text-white tracking-tight">
-            Water Level & Precipitation Time-Series Analytics
-          </h3>
+
+          {/* Current reading pill & live indicator */}
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              LIVE TELEMETRY STREAM
+            </div>
+
+            <div className="text-right">
+              <div className="text-[10px] text-slate-400 uppercase font-semibold">Current Water Level</div>
+              <div className="text-2xl font-bold text-cyan-300 font-mono">
+                {latest.waterLevel.toFixed(2)}m
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* View mode toggle */}
-        <div className="flex items-center gap-1 bg-black/40 p-1 rounded-lg border border-white/10 font-mono text-xs">
-          <button
-            onClick={() => setActiveTab('both')}
-            className={`px-3 py-1 rounded transition-all ${
-              activeTab === 'both' ? 'bg-cyan-600 text-white font-bold shadow' : 'text-zinc-400 hover:text-white'
-            }`}
-          >
-            SPLIT VIEW
-          </button>
-          <button
-            onClick={() => setActiveTab('water')}
-            className={`px-3 py-1 rounded transition-all flex items-center gap-1 ${
-              activeTab === 'water' ? 'bg-cyan-600 text-white font-bold shadow' : 'text-zinc-400 hover:text-white'
-            }`}
-          >
-            <Waves size={12} /> WATER LEVEL
-          </button>
-          <button
-            onClick={() => setActiveTab('rainfall')}
-            className={`px-3 py-1 rounded transition-all flex items-center gap-1 ${
-              activeTab === 'rainfall' ? 'bg-indigo-600 text-white font-bold shadow' : 'text-zinc-400 hover:text-white'
-            }`}
-          >
-            <CloudRain size={12} /> RAINFALL
-          </button>
+        {/* Legend bar */}
+        <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-slate-300 mb-3 px-1">
+          <div className="flex items-center gap-5">
+            <span className="flex items-center gap-1.5 font-medium">
+              <span className="w-3.5 h-0.5 bg-red-500 inline-block" />
+              <strong className="text-red-400">Danger Threshold: {floodThreshold.toFixed(2)}m</strong>
+            </span>
+            <span className="flex items-center gap-1.5 font-medium">
+              <span className="w-3.5 h-0.5 bg-orange-400 inline-block" />
+              <strong className="text-orange-400">Warning Threshold: {warningThreshold.toFixed(2)}m</strong>
+            </span>
+            <span className="flex items-center gap-1.5 font-medium text-cyan-300">
+              <span className="w-3.5 h-1.5 rounded-sm bg-cyan-400 inline-block" />
+              Pine River Hydro Node Alpha Telemetry
+            </span>
+          </div>
+          <span className="text-slate-400 text-[11px]">30-minute interval readings · Auto-syncing</span>
+        </div>
+
+        {/* Full-Width Recharts Area */}
+        <div className="w-full h-[270px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={historicalData} margin={{ top: 12, right: 20, left: -10, bottom: 0 }}>
+              <defs>
+                <linearGradient id="waterLevelGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.4} />
+                  <stop offset="95%" stopColor="#0284c7" stopOpacity={0.0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+              <XAxis dataKey="timestamp" stroke="#64748b" tick={{ fill: '#94a3b8', fontSize: 11 }} />
+              <YAxis
+                domain={[Math.floor(minWater * 0.8), Math.ceil(maxWater * 1.1)]}
+                stroke="#64748b"
+                tick={{ fill: '#94a3b8', fontSize: 11 }}
+                unit="m"
+              />
+              <Tooltip content={<WaterCustomTooltip />} />
+
+              <ReferenceLine
+                y={floodThreshold}
+                stroke="#ef4444"
+                strokeDasharray="4 4"
+                strokeWidth={2}
+                label={{
+                  value: `DANGER LIMIT (${floodThreshold}m)`,
+                  fill: '#ef4444',
+                  fontSize: 10,
+                  position: 'top'
+                }}
+              />
+
+              <ReferenceLine
+                y={warningThreshold}
+                stroke="#f97316"
+                strokeDasharray="3 3"
+                strokeWidth={1.5}
+                label={{
+                  value: `WARNING LIMIT (${warningThreshold}m)`,
+                  fill: '#f97316',
+                  fontSize: 10,
+                  position: 'top'
+                }}
+              />
+
+              <Area
+                type="monotone"
+                dataKey="waterLevel"
+                stroke="#38bdf8"
+                strokeWidth={3}
+                fillOpacity={1}
+                fill="url(#waterLevelGradient)"
+                dot={{ fill: '#38bdf8', r: 3.5, stroke: '#0369a1', strokeWidth: 1.5 }}
+                activeDot={{ r: 6, fill: '#ffffff', stroke: '#38bdf8', strokeWidth: 2 }}
+                isAnimationActive={false}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Bottom Metrics Bar */}
+        <div className="flex flex-wrap items-center justify-between text-xs text-slate-300 mt-4 pt-3 border-t border-white/10">
+          <span>MIN RECORDED: <strong className="text-white font-mono">{Math.min(...historicalData.map(d => d.waterLevel)).toFixed(2)}m</strong></span>
+          <span>PEAK RECORDED: <strong className="text-cyan-300 font-mono">{Math.max(...historicalData.map(d => d.waterLevel)).toFixed(2)}m</strong></span>
+          <span>DISCHARGE STATUS: <strong className={latest.waterLevel >= floodThreshold ? 'text-red-400 font-semibold' : 'text-emerald-400 font-semibold'}>
+            {latest.waterLevel >= floodThreshold ? 'CRITICAL FLOOD STAGE BREACHED' : 'NORMAL HYDRAULIC DISCHARGE'}
+          </strong></span>
         </div>
       </div>
 
-      {/* Grid of Charts */}
-      <div className={`grid gap-5 ${activeTab === 'both' ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
-        {/* ========================================================
-            SECTION 4: WATER LEVEL TREND CHART
-           ======================================================== */}
-        {(activeTab === 'both' || activeTab === 'water') && (
-          <div
-            className="field-panel p-5 rounded-lg flex flex-col justify-between"
-            style={{
-              background: 'linear-gradient(160deg, rgba(16,24,24,0.96) 0%, rgba(11,18,17,0.98) 100%)',
-              border: '1px solid rgba(56,189,248,0.25)'
-            }}
-          >
-            {/* Top Stat Header */}
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <div className="p-1 rounded bg-cyan-500/15 text-cyan-400 border border-cyan-500/30">
-                    <Waves size={15} />
-                  </div>
-                  <h4 className="text-sm font-bold text-white font-mono">
-                    Water Level Trend Chart (Stage Height)
-                  </h4>
-                  <span className="flex items-center gap-1 text-[9px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> LIVE STREAM
-                  </span>
-                </div>
-                <div className="text-[11px] font-mono text-zinc-400 mt-1">
-                  Pine River Valley Sector 4 Primary Hydrostatic Stage
-                </div>
+      {/* ========================================================
+          SECTION 5: RAINFALL TREND CHART (FULL WIDTH)
+         ======================================================== */}
+      <div
+        className="field-panel p-6 rounded-xl flex flex-col justify-between"
+        style={{
+          background: 'linear-gradient(160deg, rgba(15,23,42,0.95) 0%, rgba(10,15,26,0.98) 100%)',
+          border: '1px solid rgba(129,140,248,0.25)',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.35)'
+        }}
+      >
+        {/* Section Header */}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-indigo-950/70 border border-indigo-500/40 flex items-center justify-center text-indigo-400">
+              <CloudRain size={22} />
+            </div>
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-wider text-indigo-400">
+                SECTION 5 · PRECIPITATION & RUNOFF ACCUMULATION
               </div>
-
-              {/* Current Value Pill */}
-              <div className="text-right">
-                <span className="text-[10px] font-mono text-zinc-400 uppercase">Current Stage</span>
-                <div className="text-xl font-mono font-black text-cyan-300">
-                  {latest.waterLevel.toFixed(2)}m
-                </div>
-              </div>
-            </div>
-
-            {/* Threshold Legend Bar */}
-            <div className="flex items-center gap-4 text-[10px] font-mono text-zinc-400 mb-2 px-1">
-              <span className="flex items-center gap-1.5">
-                <span className="w-3 h-0.5 bg-red-500 inline-block" />
-                <strong className="text-red-400">Danger: {floodThreshold.toFixed(2)}m</strong>
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-3 h-0.5 bg-orange-500 inline-block" />
-                <strong className="text-orange-400">Warning: {warningThreshold.toFixed(2)}m</strong>
-              </span>
-              <span className="ml-auto text-zinc-500">Interval: 30 min ticks</span>
-            </div>
-
-            {/* Recharts Area Chart */}
-            <div className="w-full h-[240px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart
-                  data={historicalData}
-                  margin={{ top: 10, right: 15, left: -15, bottom: 0 }}
-                >
-                  <defs>
-                    <linearGradient id="waterGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.45} />
-                      <stop offset="95%" stopColor="#0284c7" stopOpacity={0.0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                  <XAxis
-                    dataKey="timestamp"
-                    stroke="#52525b"
-                    tick={{ fill: '#71717a', fontSize: 10, fontFamily: 'monospace' }}
-                  />
-                  <YAxis
-                    domain={[Math.floor(minWater * 0.8), Math.ceil(maxWater * 1.15)]}
-                    stroke="#52525b"
-                    tick={{ fill: '#71717a', fontSize: 10, fontFamily: 'monospace' }}
-                    unit="m"
-                  />
-                  <Tooltip content={<WaterCustomTooltip />} />
-
-                  {/* Danger Reference Line */}
-                  <ReferenceLine
-                    y={floodThreshold}
-                    stroke="#ef4444"
-                    strokeDasharray="4 4"
-                    strokeWidth={1.5}
-                    label={{
-                      value: `DANGER (${floodThreshold}m)`,
-                      fill: '#ef4444',
-                      fontSize: 9,
-                      fontFamily: 'monospace',
-                      position: 'top'
-                    }}
-                  />
-
-                  {/* Warning Reference Line */}
-                  <ReferenceLine
-                    y={warningThreshold}
-                    stroke="#f97316"
-                    strokeDasharray="3 3"
-                    strokeWidth={1}
-                    label={{
-                      value: `WARNING (${warningThreshold}m)`,
-                      fill: '#f97316',
-                      fontSize: 9,
-                      fontFamily: 'monospace',
-                      position: 'top'
-                    }}
-                  />
-
-                  <Area
-                    type="monotone"
-                    dataKey="waterLevel"
-                    stroke="#38bdf8"
-                    strokeWidth={2.5}
-                    fillOpacity={1}
-                    fill="url(#waterGradient)"
-                    dot={{ fill: '#38bdf8', r: 3, stroke: '#082f49', strokeWidth: 1.5 }}
-                    activeDot={{ r: 6, fill: '#ffffff', stroke: '#38bdf8', strokeWidth: 2 }}
-                    isAnimationActive={false}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Bottom summary stats */}
-            <div className="flex items-center justify-between text-[11px] font-mono text-zinc-400 mt-2 pt-2 border-t border-white/5">
-              <span>MIN: <strong className="text-zinc-200">{Math.min(...historicalData.map(d => d.waterLevel)).toFixed(2)}m</strong></span>
-              <span>PEAK: <strong className="text-cyan-300">{Math.max(...historicalData.map(d => d.waterLevel)).toFixed(2)}m</strong></span>
-              <span>STATUS: <strong className={latest.waterLevel >= floodThreshold ? 'text-red-400' : 'text-emerald-400'}>
-                {latest.waterLevel >= floodThreshold ? 'CRITICAL EXCEEDANCE' : 'CONTROLLED'}
-              </strong></span>
+              <h2 className="text-xl font-bold text-white tracking-tight">
+                Rainfall Trend Chart & Catchment Storm History
+              </h2>
             </div>
           </div>
-        )}
 
-        {/* ========================================================
-            SECTION 5: RAINFALL TREND CHART
-           ======================================================== */}
-        {(activeTab === 'both' || activeTab === 'rainfall') && (
-          <div
-            className="field-panel p-5 rounded-lg flex flex-col justify-between"
-            style={{
-              background: 'linear-gradient(160deg, rgba(18,20,28,0.96) 0%, rgba(13,14,21,0.98) 100%)',
-              border: '1px solid rgba(99,102,241,0.25)'
-            }}
-          >
-            {/* Top Stat Header */}
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <div className="p-1 rounded bg-indigo-500/15 text-indigo-400 border border-indigo-500/30">
-                    <CloudRain size={15} />
-                  </div>
-                  <h4 className="text-sm font-bold text-white font-mono">
-                    Rainfall Trend Chart (Precipitation History)
-                  </h4>
-                  <span className="flex items-center gap-1 text-[9px] font-mono font-bold text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20">
-                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" /> LIVE STREAM
-                  </span>
-                </div>
-                <div className="text-[11px] font-mono text-zinc-400 mt-1">
-                  Pine River Upstream Catchment Optical Rain Gauge
-                </div>
+          {/* Current reading pill & live indicator */}
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 text-xs font-semibold">
+              <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
+              LIVE PRECIPITATION FEED
+            </div>
+
+            <div className="text-right">
+              <div className="text-[10px] text-slate-400 uppercase font-semibold">Current Precipitation</div>
+              <div className="text-2xl font-bold text-indigo-300 font-mono">
+                {latest.rainfall.toFixed(1)} <span className="text-sm font-sans text-slate-400">mm/hr</span>
               </div>
-
-              {/* Current Value Pill */}
-              <div className="text-right">
-                <span className="text-[10px] font-mono text-zinc-400 uppercase">Current Rate</span>
-                <div className="text-xl font-mono font-black text-indigo-300">
-                  {latest.rainfall.toFixed(1)} <span className="text-xs">mm/h</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Threshold Legend Bar */}
-            <div className="flex items-center gap-4 text-[10px] font-mono text-zinc-400 mb-2 px-1">
-              <span className="flex items-center gap-1.5">
-                <span className="w-3 h-0.5 bg-red-400 inline-block" />
-                <strong className="text-red-400">Extreme Rain Threshold: {heavyRainThreshold} mm/h</strong>
-              </span>
-              <span className="ml-auto text-zinc-500">Intensity Unit: mm/hr</span>
-            </div>
-
-            {/* Recharts Line / Area Chart */}
-            <div className="w-full h-[240px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart
-                  data={historicalData}
-                  margin={{ top: 10, right: 15, left: -15, bottom: 0 }}
-                >
-                  <defs>
-                    <linearGradient id="rainGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#818cf8" stopOpacity={0.45} />
-                      <stop offset="95%" stopColor="#4f46e5" stopOpacity={0.0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                  <XAxis
-                    dataKey="timestamp"
-                    stroke="#52525b"
-                    tick={{ fill: '#71717a', fontSize: 10, fontFamily: 'monospace' }}
-                  />
-                  <YAxis
-                    domain={[0, Math.ceil(maxRain * 1.15)]}
-                    stroke="#52525b"
-                    tick={{ fill: '#71717a', fontSize: 10, fontFamily: 'monospace' }}
-                    unit="mm"
-                  />
-                  <Tooltip content={<RainCustomTooltip />} />
-
-                  {/* Heavy Rain Reference Line */}
-                  <ReferenceLine
-                    y={heavyRainThreshold}
-                    stroke="#ef4444"
-                    strokeDasharray="4 4"
-                    strokeWidth={1.5}
-                    label={{
-                      value: `EXTREME (${heavyRainThreshold}mm/h)`,
-                      fill: '#ef4444',
-                      fontSize: 9,
-                      fontFamily: 'monospace',
-                      position: 'top'
-                    }}
-                  />
-
-                  <Area
-                    type="monotone"
-                    dataKey="rainfall"
-                    stroke="#818cf8"
-                    strokeWidth={2.5}
-                    fillOpacity={1}
-                    fill="url(#rainGradient)"
-                    dot={{ fill: '#818cf8', r: 3, stroke: '#1e1b4b', strokeWidth: 1.5 }}
-                    activeDot={{ r: 6, fill: '#ffffff', stroke: '#818cf8', strokeWidth: 2 }}
-                    isAnimationActive={false}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Bottom summary stats */}
-            <div className="flex items-center justify-between text-[11px] font-mono text-zinc-400 mt-2 pt-2 border-t border-white/5">
-              <span>AVG RATE: <strong className="text-zinc-200">
-                {(historicalData.reduce((acc, d) => acc + d.rainfall, 0) / (historicalData.length || 1)).toFixed(1)} mm/h
-              </strong></span>
-              <span>PEAK RATE: <strong className="text-indigo-300">
-                {Math.max(...historicalData.map(d => d.rainfall)).toFixed(1)} mm/h
-              </strong></span>
-              <span>24H ACCUM: <strong className="text-cyan-300">114.2 mm</strong></span>
             </div>
           </div>
-        )}
+        </div>
+
+        {/* Legend bar */}
+        <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-slate-300 mb-3 px-1">
+          <div className="flex items-center gap-5">
+            <span className="flex items-center gap-1.5 font-medium">
+              <span className="w-3.5 h-0.5 bg-red-400 inline-block" />
+              <strong className="text-red-400">Extreme Rainfall Threshold: {heavyRainThreshold} mm/hr</strong>
+            </span>
+            <span className="flex items-center gap-1.5 font-medium text-indigo-300">
+              <span className="w-3.5 h-1.5 rounded-sm bg-indigo-400 inline-block" />
+              Pine River Basin Meteorological Station Feed
+            </span>
+          </div>
+          <span className="text-slate-400 text-[11px]">24-Hour Cumulative: 114.2 mm</span>
+        </div>
+
+        {/* Full-Width Recharts Area */}
+        <div className="w-full h-[270px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={historicalData} margin={{ top: 12, right: 20, left: -10, bottom: 0 }}>
+              <defs>
+                <linearGradient id="rainfallGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#818cf8" stopOpacity={0.4} />
+                  <stop offset="95%" stopColor="#4f46e5" stopOpacity={0.0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+              <XAxis dataKey="timestamp" stroke="#64748b" tick={{ fill: '#94a3b8', fontSize: 11 }} />
+              <YAxis
+                domain={[0, Math.ceil(maxRain * 1.15)]}
+                stroke="#64748b"
+                tick={{ fill: '#94a3b8', fontSize: 11 }}
+                unit="mm"
+              />
+              <Tooltip content={<RainCustomTooltip />} />
+
+              <ReferenceLine
+                y={heavyRainThreshold}
+                stroke="#ef4444"
+                strokeDasharray="4 4"
+                strokeWidth={2}
+                label={{
+                  value: `EXTREME PRECIPITATION (${heavyRainThreshold} mm/h)`,
+                  fill: '#ef4444',
+                  fontSize: 10,
+                  position: 'top'
+                }}
+              />
+
+              <Area
+                type="monotone"
+                dataKey="rainfall"
+                stroke="#818cf8"
+                strokeWidth={3}
+                fillOpacity={1}
+                fill="url(#rainfallGradient)"
+                dot={{ fill: '#818cf8', r: 3.5, stroke: '#312e81', strokeWidth: 1.5 }}
+                activeDot={{ r: 6, fill: '#ffffff', stroke: '#818cf8', strokeWidth: 2 }}
+                isAnimationActive={false}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Bottom Metrics Bar */}
+        <div className="flex flex-wrap items-center justify-between text-xs text-slate-300 mt-4 pt-3 border-t border-white/10">
+          <span>AVERAGE RAIN RATE: <strong className="text-white font-mono">{(historicalData.reduce((acc, d) => acc + d.rainfall, 0) / (historicalData.length || 1)).toFixed(1)} mm/hr</strong></span>
+          <span>PEAK RAIN RATE: <strong className="text-indigo-300 font-mono">{Math.max(...historicalData.map(d => d.rainfall)).toFixed(1)} mm/hr</strong></span>
+          <span>INTENSITY CLASSIFICATION: <strong className="text-red-400 font-semibold">TORRENTIAL MONSOON PRECIPITATION</strong></span>
+        </div>
       </div>
     </div>
   );
