@@ -2,62 +2,48 @@
 .map-container {
   position: relative;
   width: 100%;
-  height: 440px;
+  height: 480px;
   border-radius: 8px;
   overflow: hidden;
   border: 1px solid var(--border-raw);
   background: #111612;
 }
 
-/* ── Mock Map Canvas ─────────────────────────────────────────────── */
-.mock-map-canvas {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(160deg, #161e14 0%, #1a2518 40%, #131b11 100%);
-  overflow: hidden;
+/* ── Leaflet Popup Dark Theme ────────────────────────────────────── */
+.leaflet-popup-content-wrapper {
+  background: rgba(13, 18, 15, 0.97) !important;
+  color: #e8ede6 !important;
+  border: 1px solid rgba(56, 189, 248, 0.4) !important;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.7) !important;
+  border-radius: 8px !important;
+  backdrop-filter: blur(10px);
 }
 
-/* Grid overlay */
-.mock-map-canvas::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(90,138,74,0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(90,138,74,0.04) 1px, transparent 1px);
-  background-size: 48px 48px;
-  pointer-events: none;
+.leaflet-popup-content {
+  margin: 10px 12px !important;
+  line-height: 1.4 !important;
 }
 
-/* ── Sensor Pins ─────────────────────────────────────────────────── */
-.map-sensor-pin {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 5px;
-  z-index: 10;
-  transition: z-index 0s;
+.leaflet-popup-tip {
+  background: rgba(13, 18, 15, 0.97) !important;
+  border: 1px solid rgba(56, 189, 248, 0.4) !important;
 }
 
-.map-sensor-pin:hover {
-  z-index: 20;
+.leaflet-popup-close-button {
+  color: #71717a !important;
+  padding: 4px !important;
 }
 
-.pin-label {
-  white-space: nowrap;
-  font-size: 0.6rem;
-  padding: 2px 6px;
-  border-radius: 3px;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.2s ease, transform 0.2s ease;
-  transform: translateY(2px);
+.leaflet-popup-close-button:hover {
+  color: #ffffff !important;
 }
 
-.map-sensor-pin:hover .pin-label {
-  opacity: 1;
-  transform: translateY(0);
+.leaflet-container {
+  font-family: var(--font-sans);
+}
+
+/* Custom Marker styles */
+.custom-flood-marker {
+  background: transparent !important;
+  border: none !important;
 }
