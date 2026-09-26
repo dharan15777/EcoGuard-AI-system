@@ -1,4 +1,12 @@
-import { FloodSensor, FloodAlert, AIPredictionData, AIRecommendedAction, HistoricalReading, FloodRiskTier } from '../types/flood';
+import {
+  FloodSensor,
+  FloodAlert,
+  AIPredictionData,
+  AIRecommendedAction,
+  HistoricalReading,
+  FloodRiskTier,
+  HourlyPrediction
+} from '../types/flood';
 
 export const RISK_COLORS = {
   SAFE: {
@@ -39,6 +47,62 @@ export const RISK_COLORS = {
   }
 };
 
+/**
+ * Exact flood risk classification based on user requirements:
+ * SAFE: Water Level < 2.0 m, Rainfall < 10 mm/hr
+ * WATCH: Water Level 2.0 - 3.5 m, Rainfall 10 - 25 mm/hr
+ * WARNING: Water Level 3.5 - 4.2 m, Rainfall 25 - 40 mm/hr
+ * DANGER: Water Level > 4.2 m, Rainfall > 40 mm/hr
+ */
+export const classifyFloodRisk = (
+  waterLevel: number,
+  rainfallRate: number,
+  riseRate = 0.05
+): FloodRiskTier => {
+  // Danger conditions
+  if (waterLevel >= 4.2 || rainfallRate >= 40.0 || (waterLevel >= 4.0 && riseRate >= 0.30)) {
+    return 'DANGER';
+  }
+  // Warning conditions
+  if (waterLevel >= 3.5 || rainfallRate >= 25.0 || (waterLevel >= 3.2 && riseRate >= 0.20)) {
+    return 'WARNING';
+  }
+  // Watch conditions
+  if (waterLevel >= 2.0 || rainfallRate >= 10.0 || (waterLevel >= 1.9 && riseRate >= 0.10)) {
+    return 'WATCH';
+  }
+  // Safe conditions
+  return 'SAFE';
+};
+
+/**
+ * Continuous 0 to 100 risk score calculation
+ */
+export const calculateRiskScore = (
+  waterLevel: number,
+  rainfallRate: number,
+  riseRate = 0.05,
+  soilMoisture = 50
+): number => {
+  const tier = classifyFloodRisk(waterLevel, rainfallRate, riseRate);
+
+  if (tier === 'SAFE') {
+    const fraction = Math.min(1, Math.max(0, (waterLevel / 2.0) * 0.6 + (rainfallRate / 10.0) * 0.4));
+    return Math.round(5 + fraction * 20); // 5 to 25
+  }
+  if (tier === 'WATCH') {
+    const fraction = Math.min(1, Math.max(0, ((waterLevel - 2.0) / 1.5) * 0.6 + ((rainfallRate - 10.0) / 15.0) * 0.4));
+    return Math.round(26 + fraction * 24); // 26 to 50
+  }
+  if (tier === 'WARNING') {
+    const fraction = Math.min(1, Math.max(0, ((waterLevel - 3.5) / 0.7) * 0.6 + ((rainfallRate - 25.0) / 15.0) * 0.4));
+    return Math.round(51 + fraction * 24); // 51 to 75
+  }
+  // DANGER
+  const fraction = Math.min(1, Math.max(0, ((waterLevel - 4.2) / 0.8) * 0.6 + ((rainfallRate - 40.0) / 25.0) * 0.4));
+  return Math.round(76 + fraction * 24); // 76 to 100
+};
+
 export const getRiskTierFromScore = (score: number): FloodRiskTier => {
   if (score >= 76) return 'DANGER';
   if (score >= 51) return 'WARNING';
@@ -59,6 +123,9 @@ export const INITIAL_FLOOD_SENSORS: FloodSensor[] = [
     floodThreshold: 4.20,
     warningThreshold: 3.50,
     rainfallRate: 48.5,
+    riseRate: 0.34,
+    soilMoisture: 92,
+    riverFlowRate: 320,
     batteryLevel: 94.2,
     status: 'ONLINE',
     riskScore: 88,
@@ -76,9 +143,12 @@ export const INITIAL_FLOOD_SENSORS: FloodSensor[] = [
     latitude: 37.7833,
     longitude: -122.4167,
     waterLevel: 3.85,
-    floodThreshold: 4.00,
-    warningThreshold: 3.40,
-    rainfallRate: 41.2,
+    floodThreshold: 4.20,
+    warningThreshold: 3.50,
+    rainfallRate: 38.2,
+    riseRate: 0.24,
+    soilMoisture: 84,
+    riverFlowRate: 240,
     batteryLevel: 88.0,
     status: 'ONLINE',
     riskScore: 72,
@@ -96,9 +166,12 @@ export const INITIAL_FLOOD_SENSORS: FloodSensor[] = [
     latitude: 37.7650,
     longitude: -122.4350,
     waterLevel: 2.95,
-    floodThreshold: 3.60,
-    warningThreshold: 2.80,
-    rainfallRate: 28.0,
+    floodThreshold: 4.20,
+    warningThreshold: 3.50,
+    rainfallRate: 21.0,
+    riseRate: 0.12,
+    soilMoisture: 68,
+    riverFlowRate: 140,
     batteryLevel: 96.5,
     status: 'ONLINE',
     riskScore: 46,
@@ -116,9 +189,12 @@ export const INITIAL_FLOOD_SENSORS: FloodSensor[] = [
     latitude: 37.7510,
     longitude: -122.4180,
     waterLevel: 1.85,
-    floodThreshold: 3.20,
-    warningThreshold: 2.50,
-    rainfallRate: 14.5,
+    floodThreshold: 4.20,
+    warningThreshold: 3.50,
+    rainfallRate: 8.5,
+    riseRate: 0.03,
+    soilMoisture: 42,
+    riverFlowRate: 65,
     batteryLevel: 91.0,
     status: 'ONLINE',
     riskScore: 21,
@@ -136,13 +212,16 @@ export const INITIAL_FLOOD_SENSORS: FloodSensor[] = [
     latitude: 37.7920,
     longitude: -122.4050,
     waterLevel: 3.20,
-    floodThreshold: 3.80,
-    warningThreshold: 3.00,
-    rainfallRate: 34.0,
+    floodThreshold: 4.20,
+    warningThreshold: 3.50,
+    rainfallRate: 24.0,
+    riseRate: 0.15,
+    soilMoisture: 72,
+    riverFlowRate: 165,
     batteryLevel: 84.7,
     status: 'ONLINE',
-    riskScore: 54,
-    riskTier: 'WARNING',
+    riskScore: 48,
+    riskTier: 'WATCH',
     lastPing: new Date(Date.now() - 45000).toISOString(),
     firmwareVersion: 'v3.1.2-HydroEdge',
     signalStrength: '-81 dBm (NB-IoT)'
@@ -156,12 +235,15 @@ export const INITIAL_FLOOD_SENSORS: FloodSensor[] = [
     latitude: 37.7400,
     longitude: -122.4450,
     waterLevel: 4.65,
-    floodThreshold: 4.10,
-    warningThreshold: 3.30,
-    rainfallRate: 51.5,
+    floodThreshold: 4.20,
+    warningThreshold: 3.50,
+    rainfallRate: 46.0,
+    riseRate: 0.36,
+    soilMoisture: 95,
+    riverFlowRate: 310,
     batteryLevel: 78.4,
     status: 'ONLINE',
-    riskScore: 82,
+    riskScore: 84,
     riskTier: 'DANGER',
     lastPing: new Date(Date.now() - 20000).toISOString(),
     firmwareVersion: 'v3.2.0-HydroEdge',
@@ -172,7 +254,7 @@ export const INITIAL_FLOOD_SENSORS: FloodSensor[] = [
 export const INITIAL_FLOOD_ALERTS: FloodAlert[] = [
   {
     id: 'ALT-FLD-8801',
-    alertType: 'Flash Flood Emergency Warning',
+    alertType: 'Critical Flood Warning',
     location: 'Pine River Valley Sector 4 & Lowland Basin',
     severity: 'CRITICAL',
     detectionTime: new Date(Date.now() - 8 * 60 * 1000).toISOString(),
@@ -185,7 +267,7 @@ export const INITIAL_FLOOD_ALERTS: FloodAlert[] = [
   },
   {
     id: 'ALT-FLD-8802',
-    alertType: 'Causeway Inundation Barrier Alert',
+    alertType: 'Prepare Evacuation: Danger Level Expected',
     location: 'Old Highway 9 Low Water Bridge (Causeway)',
     severity: 'CRITICAL',
     detectionTime: new Date(Date.now() - 19 * 60 * 1000).toISOString(),
@@ -198,7 +280,7 @@ export const INITIAL_FLOOD_ALERTS: FloodAlert[] = [
   },
   {
     id: 'ALT-FLD-8803',
-    alertType: 'Dam Spillway Crest Warning',
+    alertType: 'Flood Risk Expected Within 6 Hours',
     location: 'Cascade Reservoir Spillway Gate #2',
     severity: 'HIGH',
     detectionTime: new Date(Date.now() - 35 * 60 * 1000).toISOString(),
@@ -211,90 +293,181 @@ export const INITIAL_FLOOD_ALERTS: FloodAlert[] = [
   }
 ];
 
-export const generateHistoricalData = (count = 14): HistoricalReading[] => {
+/**
+ * Generate historical time-series with water level curve matching the active condition
+ */
+export const generateHistoricalData = (
+  count = 16,
+  targetLevel = 4.82,
+  targetRain = 48.5
+): HistoricalReading[] => {
   const readings: HistoricalReading[] = [];
   const now = Date.now();
   const stepMs = 30 * 60 * 1000; // 30 min intervals
 
   for (let i = count - 1; i >= 0; i--) {
     const t = new Date(now - i * stepMs);
-    const timeStr = t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-    
-    // Simulate realistic storm surge progression: starts low, ramps up significantly
+    const timeStr = t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    // Smooth curve culminating at targetLevel and targetRain
     const progress = 1 - (i / count);
-    const baseWater = 2.1 + progress * 2.6 + Math.sin(progress * 4) * 0.2;
-    const baseRain = 8 + progress * 38 + Math.cos(progress * 3) * 4;
-    const baseRisk = Math.min(100, Math.round(15 + progress * 72));
+    const startLevel = Math.max(1.2, targetLevel * 0.45);
+    const startRain = Math.max(2.0, targetRain * 0.25);
+
+    const water = startLevel + (targetLevel - startLevel) * Math.pow(progress, 1.4) + (Math.random() - 0.5) * 0.05;
+    const rain = startRain + (targetRain - startRain) * progress + (Math.random() - 0.5) * 1.5;
+    const score = calculateRiskScore(water, rain);
 
     readings.push({
       timestamp: timeStr,
-      waterLevel: parseFloat(baseWater.toFixed(2)),
-      rainfall: parseFloat(baseRain.toFixed(1)),
-      riskScore: baseRisk
+      waterLevel: parseFloat(water.toFixed(2)),
+      rainfall: parseFloat(Math.max(0, rain).toFixed(1)),
+      riskScore: score
     });
   }
 
   return readings;
 };
 
-export const getAIPrediction = (currentRiskScore: number, currentWaterLevel: number, currentRainfall: number): AIPredictionData => {
+/**
+ * AI Flood Prediction Module for 1h, 3h, 6h, 12h, 24h, 30h
+ */
+export const getAIPrediction = (
+  currentRiskScore: number,
+  currentWaterLevel: number,
+  currentRainfall: number,
+  riseRate = 0.05
+): AIPredictionData => {
   const now = new Date();
-  const hourly: AIPredictionData['hourlyForecast'] = [];
-  
-  // Project next 6 hours (+1h to +6h)
-  const horizons = [
-    { offsetH: 1, rainDelta: +3.2, levelDelta: +0.28, riskMultiplier: 1.06 },
-    { offsetH: 2, rainDelta: +5.5, levelDelta: +0.45, riskMultiplier: 1.12 },
-    { offsetH: 3, rainDelta: +2.1, levelDelta: +0.58, riskMultiplier: 1.15 }, // Peak Inundation
-    { offsetH: 4, rainDelta: -8.0, levelDelta: +0.35, riskMultiplier: 1.08 },
-    { offsetH: 5, rainDelta: -16.4, levelDelta: -0.15, riskMultiplier: 0.94 },
-    { offsetH: 6, rainDelta: -24.0, levelDelta: -0.45, riskMultiplier: 0.82 },
+  const currentRisk = classifyFloodRisk(currentWaterLevel, currentRainfall, riseRate);
+
+  // Time horizons required: 1 Hour, 3 Hours, 6 Hours, 12 Hours, 24 Hours, 30 Hours
+  const horizonsConfig = [
+    { hours: 1, label: '1 Hour' },
+    { hours: 3, label: '3 Hours' },
+    { hours: 6, label: '6 Hours' },
+    { hours: 12, label: '12 Hours' },
+    { hours: 24, label: '24 Hours' },
+    { hours: 30, label: '30 Hours' }
   ];
 
-  horizons.forEach(h => {
-    const forecastTime = new Date(now.getTime() + h.offsetH * 3600 * 1000);
-    const timeLabel = forecastTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-    const projLevel = Math.max(1.0, parseFloat((currentWaterLevel + h.levelDelta).toFixed(2)));
-    const projRain = Math.max(0, parseFloat((currentRainfall + h.rainDelta).toFixed(1)));
-    const projScore = Math.min(100, Math.max(10, Math.round(currentRiskScore * h.riskMultiplier)));
-    const tier = getRiskTierFromScore(projScore);
+  const hourlyForecast: HourlyPrediction[] = horizonsConfig.map(h => {
+    const futureTime = new Date(now.getTime() + h.hours * 3600 * 1000);
+    const timeLabel = futureTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 
-    let summary = 'Rising water level with sustained catchment runoff.';
-    if (h.offsetH === 3) summary = 'CRITICAL INUNDATION PEAK EXPECTED. River crests at highest stage.';
-    else if (h.offsetH <= 2) summary = 'Rapid stage rise due to continuous upstream precipitation.';
-    else if (h.offsetH >= 5) summary = 'Rainfall easing; downstream discharge begins gradual recession.';
+    let projLevel: number;
+    let projRain: number;
 
-    hourly.push({
-      hour: `+${h.offsetH}h`,
+    if (currentRisk === 'DANGER') {
+      // In surge: rises up to peak around 6h-12h, then remains severe through 24h-30h
+      if (h.hours === 1) projLevel = currentWaterLevel + 0.20;
+      else if (h.hours === 3) projLevel = currentWaterLevel + 0.45;
+      else if (h.hours === 6) projLevel = currentWaterLevel + 0.60; // Peak
+      else if (h.hours === 12) projLevel = currentWaterLevel + 0.40;
+      else if (h.hours === 24) projLevel = currentWaterLevel + 0.15;
+      else projLevel = currentWaterLevel - 0.20; // 30h
+
+      projRain = Math.max(15, currentRainfall - (h.hours > 6 ? (h.hours - 6) * 1.2 : 0));
+    } else if (currentRisk === 'WARNING') {
+      // In warning: rises towards danger over 6h to 24h
+      if (h.hours === 1) projLevel = currentWaterLevel + 0.15;
+      else if (h.hours === 3) projLevel = currentWaterLevel + 0.35;
+      else if (h.hours === 6) projLevel = currentWaterLevel + 0.55; // breaches danger
+      else if (h.hours === 12) projLevel = currentWaterLevel + 0.80;
+      else if (h.hours === 24) projLevel = currentWaterLevel + 1.05;
+      else projLevel = currentWaterLevel + 0.90;
+
+      projRain = Math.max(10, currentRainfall + (h.hours <= 6 ? 5 : -5));
+    } else if (currentRisk === 'WATCH') {
+      // In watch: user example shows current 3.2m -> 1h: 3.4m, 3h: 3.8m, 6h: 4.1m, 12h: 4.4m, 24h: 4.8m, 30h: 5.2m
+      if (h.hours === 1) projLevel = currentWaterLevel + 0.20;
+      else if (h.hours === 3) projLevel = currentWaterLevel + 0.55;
+      else if (h.hours === 6) projLevel = currentWaterLevel + 0.85;
+      else if (h.hours === 12) projLevel = currentWaterLevel + 1.20;
+      else if (h.hours === 24) projLevel = currentWaterLevel + 1.55;
+      else projLevel = currentWaterLevel + 1.90; // 30h
+
+      projRain = currentRainfall + (h.hours * 1.1);
+    } else {
+      // In SAFE: conditions remain stable and within safe limits through 30h
+      projLevel = Math.max(1.1, currentWaterLevel + Math.sin(h.hours / 4) * 0.15);
+      projRain = Math.max(1.0, currentRainfall + Math.cos(h.hours / 3) * 1.5);
+    }
+
+    const projTier = classifyFloodRisk(projLevel, projRain, 0.05);
+    const projScore = calculateRiskScore(projLevel, projRain);
+
+    let summary = 'Water level within safe parameters.';
+    if (projTier === 'DANGER') {
+      summary = h.hours >= 24
+        ? 'Severe flooding predicted. Evacuation planning mandated.'
+        : 'Danger stage reached. Overflow of primary channel expected.';
+    } else if (projTier === 'WARNING') {
+      summary = 'Rapid water rise detected. Spillway capacity at risk.';
+    } else if (projTier === 'WATCH') {
+      summary = 'Moderate catchment runoff increase. Continuous watch.';
+    }
+
+    return {
+      horizonHours: h.hours,
+      hour: h.label,
       timeLabel,
-      waterLevel: projLevel,
-      rainfall: projRain,
+      waterLevel: parseFloat(projLevel.toFixed(2)),
+      rainfall: parseFloat(projRain.toFixed(1)),
       riskScore: projScore,
-      riskTier: tier,
+      riskTier: projTier,
       summary
-    });
+    };
   });
 
-  const peakLevel = Math.max(...hourly.map(h => h.waterLevel));
+  const pred24 = hourlyForecast.find(h => h.horizonHours === 24);
+  const pred30 = hourlyForecast.find(h => h.horizonHours === 30);
+  const predictedRisk24h = pred24 ? pred24.riskTier : 'DANGER';
+  const predictedRisk30h = pred30 ? pred30.riskTier : 'DANGER';
+  const peakLevel = Math.max(...hourlyForecast.map(h => h.waterLevel));
+  const peakItem = hourlyForecast.find(h => h.waterLevel === peakLevel) || hourlyForecast[2];
+
+  let reason = '';
+  if (currentRisk === 'DANGER') {
+    reason = `Heavy rainfall (${currentRainfall.toFixed(1)} mm/h) and rapidly rising upstream water level (+${riseRate.toFixed(2)} m/h) detected in Pine River catchment. Flood danger threshold 4.20m breached.`;
+  } else if (currentRisk === 'WARNING') {
+    reason = `Sustained rainfall (${currentRainfall.toFixed(1)} mm/h) and high soil saturation driving river level towards flood danger threshold within 6 to 12 hours.`;
+  } else if (currentRisk === 'WATCH') {
+    reason = `Moderate rainfall intensity (${currentRainfall.toFixed(1)} mm/h) and steady river stage elevation detected. AI projects transition to Warning/Danger within 12-24 hours if precipitation persists.`;
+  } else {
+    reason = `Hydrological baseline is nominal. Upstream rainfall (${currentRainfall.toFixed(1)} mm/h) and water level (${currentWaterLevel.toFixed(2)}m) remain well below watch thresholds.`;
+  }
+
+  const confidence = currentRisk === 'SAFE' ? 96 : currentRisk === 'DANGER' ? 95 : 94;
 
   return {
-    confidence: 94.6,
-    reason: 'Heavy rainfall (48.5 mm/h) and rapidly rising upstream water level (+34 cm/h) detected in Pine River catchment basin. Hydro-sensor telemetry indicates soil saturation index at 92%, driving accelerated overland runoff into primary river channel.',
+    confidence,
+    currentRisk,
+    predictedRisk24h,
+    predictedRisk30h,
+    reason,
     modelName: 'Edge-AI HydroNet v3.2 (Quantized TFLite)',
     latencyMs: 12,
     projectedPeakLevel: peakLevel,
-    projectedPeakTime: '+3 Hours (16:30)',
-    hourlyForecast: hourly
+    projectedPeakTime: `${peakItem.hour} (${peakItem.timeLabel})`,
+    hourlyForecast
   };
 };
 
+/**
+ * AI Recommendations generator strictly matching the user requirement:
+ * SAFE: Continue Monitoring
+ * WATCH: Increase Monitoring Frequency
+ * WARNING: Prepare Emergency Response Teams
+ * DANGER: Start Evacuation Planning, Send Public Warning Alerts, Deploy Rescue Resources
+ */
 export const getAIRecommendedActions = (riskTier: FloodRiskTier): AIRecommendedAction[] => {
   if (riskTier === 'DANGER') {
     return [
       {
         id: 'ACT-01',
-        title: 'Prepare Evacuation Protocols',
-        description: 'Initiate Stage 2 immediate evacuation for Pine River Valley, Sector 4 riverside communities, and low-elevation clusters. Alert local rescue units.',
+        title: 'Start Evacuation Planning',
+        description: 'Initiate emergency evacuation planning and protocols for low-lying Pine River Valley sectors and vulnerable riverside communities.',
         priority: 'CRITICAL_NOW',
         icon: 'evacuate',
         status: 'PENDING',
@@ -302,37 +475,19 @@ export const getAIRecommendedActions = (riskTier: FloodRiskTier): AIRecommendedA
       },
       {
         id: 'ACT-02',
-        title: 'Avoid & Bar River Crossings',
-        description: 'Automate barricade drop at Old Highway 9 Low Water Bridge and Sector 4 causeways. Deploy traffic enforcement to prevent vehicle crossing.',
-        priority: 'CRITICAL_NOW',
-        icon: 'road',
-        status: 'PENDING',
-        category: 'Infrastructure'
-      },
-      {
-        id: 'ACT-03',
-        title: 'Notify Local Disaster Authorities',
-        description: 'Transmit automated CAP XML alert and real-time hydrological telemetry dispatch to District Disaster Management Authority (DDMA) & NDRF.',
+        title: 'Send Public Warning Alerts',
+        description: 'Broadcast high-priority emergency CAP XML and SMS cell-broadcast flood warning alerts to downstream residents and motorists.',
         priority: 'CRITICAL_NOW',
         icon: 'siren',
         status: 'DISPATCHED',
         category: 'Authority'
       },
       {
-        id: 'ACT-04',
-        title: 'Move Livestock to Higher Ground',
-        description: 'Issue targeted broadcast SMS to farmers in Pine River Basin flood zone to relocate cattle and livestock to High Ridge designated shelter.',
-        priority: 'HIGH_PRIORITY',
+        id: 'ACT-03',
+        title: 'Deploy Rescue Resources',
+        description: 'Mobilize National Disaster Response Force (NDRF), emergency rescue boat squads, and deploy sandbag barrier crews to submerged river crossings.',
+        priority: 'CRITICAL_NOW',
         icon: 'shield',
-        status: 'PENDING',
-        category: 'Livestock'
-      },
-      {
-        id: 'ACT-05',
-        title: 'Deploy Sandbag Flood Barriers',
-        description: 'Deploy rapid-response municipal crew with mobile sandbag barriers to bolster Cascade Dam drainage canal and Lowland culverts.',
-        priority: 'HIGH_PRIORITY',
-        icon: 'barrier',
         status: 'PENDING',
         category: 'Barriers'
       }
@@ -342,40 +497,22 @@ export const getAIRecommendedActions = (riskTier: FloodRiskTier): AIRecommendedA
   if (riskTier === 'WARNING') {
     return [
       {
-        id: 'ACT-02',
-        title: 'Restrict Vulnerable River Crossings',
-        description: 'Set up warning signage and prepare physical barricades at flood-prone causeways and river bridge crossings.',
+        id: 'ACT-04',
+        title: 'Prepare Emergency Response Teams',
+        description: 'Place rapid-deployment water rescue squads, medical units, and heavy mobile pumping stations on 15-minute emergency standby.',
         priority: 'HIGH_PRIORITY',
-        icon: 'road',
-        status: 'PENDING',
-        category: 'Infrastructure'
-      },
-      {
-        id: 'ACT-03',
-        title: 'Notify Local Authorities & Emergency Standby',
-        description: 'Transmit advisory status update to DDMA. Put quick-response rescue boats and pumping squads on 15-minute standby.',
-        priority: 'HIGH_PRIORITY',
-        icon: 'siren',
+        icon: 'shield',
         status: 'PENDING',
         category: 'Authority'
       },
       {
-        id: 'ACT-04',
-        title: 'Alert Livestock Owners on Flood Plain',
-        description: 'Broadcast early advisory to agrarian cooperatives regarding potential inundation in low pastures within 6 hours.',
-        priority: 'TACTICAL_ADVISORY',
-        icon: 'shield',
-        status: 'PENDING',
-        category: 'Livestock'
-      },
-      {
         id: 'ACT-05',
-        title: 'Inspect Drainage Outflows and Spillways',
-        description: 'Verify automated sluice gates on Cascade Dam and clear trash racks at urban culverts to maximize flow throughput.',
-        priority: 'TACTICAL_ADVISORY',
-        icon: 'barrier',
+        title: 'Pre-position Barrier Equipment at River Crossings',
+        description: 'Stage automated flood barricades and sandbag stockpiles at Old Highway 9 Low Water Bridge and Sector 4 causeways.',
+        priority: 'HIGH_PRIORITY',
+        icon: 'road',
         status: 'PENDING',
-        category: 'Barriers'
+        category: 'Infrastructure'
       }
     ];
   }
@@ -383,31 +520,22 @@ export const getAIRecommendedActions = (riskTier: FloodRiskTier): AIRecommendedA
   if (riskTier === 'WATCH') {
     return [
       {
-        id: 'ACT-03',
-        title: 'Notify Regional Monitoring Cell',
-        description: 'Issue internal hydro-meteorological watch notice to regional command staff. Heighten polling frequency from 5m to 1m.',
+        id: 'ACT-06',
+        title: 'Increase Monitoring Frequency',
+        description: 'Accelerate hydrological sensor polling interval from standard 15-minute cycle to real-time 1-minute automated telemetry sync.',
+        priority: 'TACTICAL_ADVISORY',
+        icon: 'shield',
+        status: 'DISPATCHED',
+        category: 'Monitoring'
+      },
+      {
+        id: 'ACT-07',
+        title: 'Alert Regional Hydro-Meteorological Cell',
+        description: 'Issue preliminary watch advisory to district disaster management control room regarding potential river crest within 12 to 24 hours.',
         priority: 'TACTICAL_ADVISORY',
         icon: 'siren',
-        status: 'DISPATCHED',
+        status: 'PENDING',
         category: 'Authority'
-      },
-      {
-        id: 'ACT-02',
-        title: 'Inspect River Crossing Sensors',
-        description: 'Run automated ping and sensor calibration on low-water crossing hydrostatic gauges.',
-        priority: 'PREPAREDNESS',
-        icon: 'road',
-        status: 'PENDING',
-        category: 'Infrastructure'
-      },
-      {
-        id: 'ACT-05',
-        title: 'Pre-position Sandbag Supplies',
-        description: 'Check municipal stockpiles for barrier materials in case precipitation exceeds 35 mm/h.',
-        priority: 'PREPAREDNESS',
-        icon: 'barrier',
-        status: 'PENDING',
-        category: 'Barriers'
       }
     ];
   }
@@ -415,13 +543,120 @@ export const getAIRecommendedActions = (riskTier: FloodRiskTier): AIRecommendedA
   // SAFE
   return [
     {
-      id: 'ACT-06',
-      title: 'Routine Hydro-Mesh Telemetry Health Check',
-      description: 'All river basins and reservoir spillways within nominal baseline levels. Continuous automated AI surveillance active.',
+      id: 'ACT-08',
+      title: 'Continue Monitoring',
+      description: 'Maintain continuous automated hydro-meteorological baseline surveillance across all Pine River basin nodes and dam spillways.',
       priority: 'PREPAREDNESS',
       icon: 'shield',
       status: 'COMPLETED',
-      category: 'Authority'
+      category: 'Monitoring'
     }
   ];
+};
+
+/**
+ * Intelligent Dynamic Alert Generator based on user rules:
+ * - If flood risk expected within 6h: "Flood Risk Expected Within 6 Hours"
+ * - If danger level expected within 24h: "Prepare Evacuation"
+ * - If severe flooding predicted within 30h: "Critical Flood Warning"
+ */
+export const generateDynamicAlerts = (
+  currentRisk: FloodRiskTier,
+  prediction: AIPredictionData,
+  currentWaterLevel: number,
+  currentRainfall: number
+): FloodAlert[] => {
+  const alerts: FloodAlert[] = [];
+  const now = new Date();
+
+  const pred6 = prediction.hourlyForecast.find(h => h.horizonHours === 6);
+  const pred24 = prediction.hourlyForecast.find(h => h.horizonHours === 24);
+  const pred30 = prediction.hourlyForecast.find(h => h.horizonHours === 30);
+
+  // Severe flooding at present or predicted within 30 hours
+  if (currentRisk === 'DANGER' || pred30?.riskTier === 'DANGER') {
+    alerts.push({
+      id: 'ALT-DYN-01',
+      alertType: 'Critical Flood Warning',
+      location: 'Pine River Valley Sector 4 & Spillway Lowlands',
+      severity: 'CRITICAL',
+      detectionTime: now.toISOString(),
+      status: 'ACTIVE',
+      waterLevel: currentWaterLevel,
+      rainfall: currentRainfall,
+      confidenceScore: 0.96,
+      description: `Stage height ${currentWaterLevel.toFixed(2)}m (breaches 4.20m flood threshold). Severe catchment flooding expected to persist through next 30 hours.`,
+      sensorId: 'SN-FLD-01'
+    });
+  }
+
+  // Danger level expected within 24 hours
+  if (currentRisk === 'DANGER' || currentRisk === 'WARNING' || pred24?.riskTier === 'DANGER') {
+    alerts.push({
+      id: 'ALT-DYN-02',
+      alertType: 'Prepare Evacuation: Danger Level Expected',
+      location: 'Pine River Low-Elevation Communities & Causeway Bridges',
+      severity: currentRisk === 'DANGER' ? 'CRITICAL' : 'HIGH',
+      detectionTime: new Date(now.getTime() - 12 * 60 * 1000).toISOString(),
+      status: 'ACTIVE',
+      waterLevel: pred24?.waterLevel || currentWaterLevel + 0.8,
+      rainfall: currentRainfall,
+      confidenceScore: 0.94,
+      description: `AI prediction forecasts water level reaching ${pred24 ? pred24.waterLevel.toFixed(2) : 4.8}m within 24 hours. Lowland residents instructed to prepare evacuation.`,
+      sensorId: 'SN-FLD-06'
+    });
+  }
+
+  // Flood risk expected within 6 hours
+  if (currentRisk === 'DANGER' || currentRisk === 'WARNING' || pred6?.riskTier === 'WARNING' || pred6?.riskTier === 'DANGER') {
+    alerts.push({
+      id: 'ALT-DYN-03',
+      alertType: 'Flood Risk Expected Within 6 Hours',
+      location: 'Cascade Dam Spillway & North Basin Crossing',
+      severity: 'HIGH',
+      detectionTime: new Date(now.getTime() - 28 * 60 * 1000).toISOString(),
+      status: 'ACTIVE',
+      waterLevel: pred6?.waterLevel || currentWaterLevel + 0.4,
+      rainfall: currentRainfall,
+      confidenceScore: 0.91,
+      description: `Inundation trajectory indicates rapid water level rise (+${prediction.hourlyForecast[2]?.waterLevel.toFixed(2)}m by +6 Hours). Automated spillway watch triggered.`,
+      sensorId: 'SN-FLD-02'
+    });
+  }
+
+  // If in WATCH and no danger/warning alerts triggered
+  if (currentRisk === 'WATCH' && alerts.length === 0) {
+    alerts.push({
+      id: 'ALT-DYN-04',
+      alertType: 'Flood Watch Advisory: Moderate River Stage Rise',
+      location: 'Pine River Basin - Sector 4 to East Ridge',
+      severity: 'MODERATE',
+      detectionTime: new Date(now.getTime() - 40 * 60 * 1000).toISOString(),
+      status: 'ACTIVE',
+      waterLevel: currentWaterLevel,
+      rainfall: currentRainfall,
+      confidenceScore: 0.88,
+      description: `Water level at ${currentWaterLevel.toFixed(2)}m with rainfall rate ${currentRainfall.toFixed(1)} mm/h. Polling frequency increased; monitoring for surge developments.`,
+      sensorId: 'SN-FLD-03'
+    });
+  }
+
+  // If in SAFE and no alerts
+  if (currentRisk === 'SAFE' && alerts.length === 0) {
+    alerts.push({
+      id: 'ALT-DYN-05',
+      alertType: 'Hydrological Sector Nominal',
+      location: 'Pine River Hydro-Mesh Network',
+      severity: 'LOW',
+      detectionTime: now.toISOString(),
+      status: 'RESOLVED',
+      waterLevel: currentWaterLevel,
+      rainfall: currentRainfall,
+      confidenceScore: 0.98,
+      description: `All river stage markers below 2.0m. Rainfall rate below 10 mm/h. Catchment basin operating within safe seasonal baseline.`,
+      sensorId: 'SN-FLD-04'
+    });
+  }
+
+  return alerts;
 };

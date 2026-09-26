@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { AIPredictionData, HourlyPrediction } from '../types/flood';
 import { RISK_COLORS } from '../utils/floodConstants';
-import { Brain, Sparkles, Clock, AlertTriangle, CloudRain, CheckCircle2, Waves, Cpu, ArrowUpRight } from 'lucide-react';
+import { Brain, Sparkles, Clock, AlertTriangle, CloudRain, CheckCircle2, Cpu } from 'lucide-react';
 
 interface AIPredictionPanelProps {
   prediction: AIPredictionData;
@@ -9,8 +9,19 @@ interface AIPredictionPanelProps {
 
 export const AIPredictionPanel: React.FC<AIPredictionPanelProps> = ({ prediction }) => {
   const [selectedHour, setSelectedHour] = useState<HourlyPrediction>(
-    prediction.hourlyForecast[2] || prediction.hourlyForecast[0]
+    prediction.hourlyForecast[4] || prediction.hourlyForecast[0] // default to 24h or first
   );
+
+  const currentRiskMeta = RISK_COLORS[prediction.currentRisk] || RISK_COLORS.SAFE;
+  const predRisk24Meta = RISK_COLORS[prediction.predictedRisk24h] || RISK_COLORS.DANGER;
+
+  // Keep selected hour in sync when prediction changes
+  React.useEffect(() => {
+    setSelectedHour(prev => {
+      const match = prediction.hourlyForecast.find(h => h.horizonHours === prev.horizonHours);
+      return match || prediction.hourlyForecast[4] || prediction.hourlyForecast[0];
+    });
+  }, [prediction]);
 
   return (
     <div
@@ -34,30 +45,49 @@ export const AIPredictionPanel: React.FC<AIPredictionPanelProps> = ({ prediction
               </span>
             </div>
             <h2 className="text-xl font-bold text-white tracking-tight">
-              AI Flood Prediction & 6-Hour Inundation Horizon
+              AI Flood Prediction & 30-Hour Inundation Horizon
             </h2>
           </div>
         </div>
 
-        {/* Prediction Confidence & Peak Crest */}
-        <div className="flex items-center gap-4">
-          <div className="p-2.5 px-4 rounded-xl bg-slate-900/90 border border-white/10 flex items-center gap-3">
-            <div className="text-right">
-              <div className="text-[10px] text-slate-400 uppercase font-semibold">AI Confidence</div>
-              <div className="text-xl font-bold text-emerald-400 font-mono flex items-center gap-1">
-                <CheckCircle2 size={16} /> {prediction.confidence}%
-              </div>
+        {/* Display: Current Flood Risk & Predicted Flood Risk (24 Hours) & Confidence */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Current Flood Risk */}
+          <div className="p-2.5 px-3.5 rounded-xl bg-slate-900/90 border border-white/10 text-right">
+            <div className="text-[10px] text-slate-400 uppercase font-semibold">Current Risk</div>
+            <div
+              className="text-base font-bold uppercase tracking-wide flex items-center gap-1 mt-0.5"
+              style={{ color: currentRiskMeta.text }}
+            >
+              <span className="w-2 h-2 rounded-full" style={{ background: currentRiskMeta.color }} />
+              {prediction.currentRisk}
             </div>
           </div>
 
-          <div className="p-2.5 px-4 rounded-xl bg-red-950/40 border border-red-500/30 flex items-center gap-3">
-            <div className="text-right">
-              <div className="text-[10px] text-red-300 uppercase font-semibold">Projected Peak Crest</div>
-              <div className="text-xl font-bold text-red-400 font-mono">
-                {prediction.projectedPeakLevel.toFixed(2)}m
-              </div>
+          {/* Predicted Flood Risk (24 Hours) */}
+          <div
+            className="p-2.5 px-3.5 rounded-xl border text-right shadow-sm"
+            style={{
+              background: predRisk24Meta.bg,
+              borderColor: predRisk24Meta.border
+            }}
+          >
+            <div className="text-[10px] uppercase font-semibold text-slate-300">Predicted Risk (24 Hours)</div>
+            <div
+              className="text-base font-bold uppercase tracking-wide flex items-center gap-1 mt-0.5"
+              style={{ color: predRisk24Meta.text }}
+            >
+              <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: predRisk24Meta.color }} />
+              {prediction.predictedRisk24h}
             </div>
-            <span className="text-xs text-red-300 font-medium">@ {prediction.projectedPeakTime}</span>
+          </div>
+
+          {/* Confidence */}
+          <div className="p-2.5 px-3.5 rounded-xl bg-slate-900/90 border border-white/10 text-right">
+            <div className="text-[10px] text-slate-400 uppercase font-semibold">Confidence</div>
+            <div className="text-base font-bold text-emerald-400 font-mono flex items-center gap-1 mt-0.5">
+              <CheckCircle2 size={15} /> {prediction.confidence}%
+            </div>
           </div>
         </div>
       </div>
@@ -69,8 +99,8 @@ export const AIPredictionPanel: React.FC<AIPredictionPanelProps> = ({ prediction
         </div>
         <div className="flex-1">
           <div className="text-xs uppercase font-bold text-amber-300 tracking-wider mb-1 flex items-center gap-2">
-            <span>Primary Reason for Prediction</span>
-            <span className="text-slate-400">· Edge Neural Net Synthesis</span>
+            <span>Reason for AI Prediction</span>
+            <span className="text-slate-400">· Edge Neural Synthesis</span>
           </div>
           <p className="text-sm font-medium text-slate-100 leading-relaxed">
             "{prediction.reason}"
@@ -78,22 +108,22 @@ export const AIPredictionPanel: React.FC<AIPredictionPanelProps> = ({ prediction
         </div>
       </div>
 
-      {/* 6-Hour Horizon Timeline across Full Width */}
+      {/* 6-Hour to 30-Hour Horizon Timeline across Full Width */}
       <div className="mb-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
             <Clock size={14} className="text-cyan-400" />
-            <span>Hour-by-Hour Inundation Trajectory (Next 6 Hours)</span>
+            <span>AI Projected Trajectory (1h, 3h, 6h, 12h, 24h, 30h Horizons)</span>
           </div>
           <span className="text-xs text-slate-400">
-            Click any hour to review projected hydrological state
+            Click horizon to view projected water level & risk
           </span>
         </div>
 
-        {/* 6 Cards across full width */}
+        {/* 6 Horizons Cards (1 Hour, 3 Hours, 6 Hours, 12 Hours, 24 Hours, 30 Hours) */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {prediction.hourlyForecast.map((hf) => {
-            const isSelected = selectedHour.hour === hf.hour;
+            const isSelected = selectedHour.horizonHours === hf.horizonHours;
             const riskMeta = RISK_COLORS[hf.riskTier] || RISK_COLORS.SAFE;
 
             return (
@@ -112,7 +142,7 @@ export const AIPredictionPanel: React.FC<AIPredictionPanelProps> = ({ prediction
                 </div>
 
                 <div className="mb-3">
-                  <span className="text-[10px] text-slate-400 block font-medium">Proj. Water Level</span>
+                  <span className="text-[10px] text-slate-400 block font-medium">Predicted Level</span>
                   <div className="text-xl font-bold text-cyan-300 font-mono mt-0.5">
                     {hf.waterLevel.toFixed(2)}m
                   </div>
@@ -139,11 +169,11 @@ export const AIPredictionPanel: React.FC<AIPredictionPanelProps> = ({ prediction
         </div>
       </div>
 
-      {/* Selected Hour Telemetry Detail & Neural Model Metadata */}
+      {/* Selected Horizon Telemetry Detail & Neural Model Metadata */}
       <div className="p-3.5 rounded-xl bg-slate-900/80 border border-white/10 flex flex-wrap items-center justify-between gap-4 text-xs">
         <div className="flex items-center gap-2.5">
           <span className="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold font-mono">
-            {selectedHour.hour} ({selectedHour.timeLabel}) Forecast
+            {selectedHour.hour} ({selectedHour.timeLabel}) Projection
           </span>
           <span className="text-slate-200 font-medium">
             {selectedHour.summary}
@@ -156,7 +186,7 @@ export const AIPredictionPanel: React.FC<AIPredictionPanelProps> = ({ prediction
             <span>Model: <strong>{prediction.modelName}</strong></span>
           </span>
           <span>·</span>
-          <span>Inference Latency: <strong className="text-slate-200 font-mono">{prediction.latencyMs}ms</strong></span>
+          <span>Latency: <strong className="text-slate-200 font-mono">{prediction.latencyMs}ms</strong></span>
         </div>
       </div>
     </div>

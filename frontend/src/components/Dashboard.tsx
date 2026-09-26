@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { FloodSensor, FloodAlert, HistoricalReading } from '../types/flood';
 import {
   INITIAL_FLOOD_SENSORS,
-  INITIAL_FLOOD_ALERTS,
   generateHistoricalData,
   getAIPrediction,
   getAIRecommendedActions,
-  getRiskTierFromScore,
+  generateDynamicAlerts,
+  classifyFloodRisk,
+  calculateRiskScore,
   RISK_COLORS
 } from '../utils/floodConstants';
 import { FloodGauge } from './FloodGauge';
@@ -29,7 +30,9 @@ import {
   CheckCircle2,
   Cpu,
   Layers,
-  MapPin
+  Info,
+  ShieldCheck,
+  AlertTriangle
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -40,71 +43,81 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
-  sensors: propSensors = [],
-  alerts: propAlerts = [],
   onAcknowledgeAlert: propAcknowledge
 }) => {
-  // Ensure ALL 6 hydrological sensor locations across the basin are always populated
+  // Scenario state: 'SURGE' (Danger), 'MODERATE' (Watch), 'SAFE' (Normal)
+  const [activeScenario, setActiveScenario] = useState<'SURGE' | 'MODERATE' | 'SAFE'>('SURGE');
+
+  // Core real-time input telemetry for primary node (Pine River Alpha)
+  const [telemetry, setTelemetry] = useState({
+    waterLevel: 4.78, // m
+    rainfallRate: 50.9, // mm/hr
+    riseRate: 0.38, // m/hr
+    soilMoisture: 94, // %
+    riverFlowRate: 340 // m³/s
+  });
+
+  // Dynamic sensors state across the entire basin
   const [sensors, setSensors] = useState<FloodSensor[]>(() => {
-    return INITIAL_FLOOD_SENSORS.map(base => {
-      const match = propSensors?.find(p => p.id === base.id);
-      if (match) {
-        return {
-          ...base,
-          status: match.status || base.status,
-          batteryLevel: match.batteryLevel ?? base.batteryLevel,
-        };
-      }
-      return base;
+    return INITIAL_FLOOD_SENSORS.map(s => {
+      const tier = classifyFloodRisk(s.waterLevel, s.rainfallRate, s.riseRate);
+      const score = calculateRiskScore(s.waterLevel, s.rainfallRate, s.riseRate, s.soilMoisture);
+      return { ...s, riskTier: tier, riskScore: score };
     });
   });
 
-  // Ensure all initial flood alerts are populated
-  const [alerts, setAlerts] = useState<FloodAlert[]>(() => {
-    if (propAlerts && propAlerts.length > 0) {
-      const floodAlerts = propAlerts.filter(a => a.hazardType === 'FLOOD' || a.id?.includes('FLD'));
-      if (floodAlerts.length > 0) {
-        // Merge with initial alerts to avoid dropping any
-        const existingIds = new Set(floodAlerts.map(a => a.id));
-        const nonDuplicateInitial = INITIAL_FLOOD_ALERTS.filter(a => !existingIds.has(a.id));
-        return [...floodAlerts.map((a, idx) => ({
-          ...INITIAL_FLOOD_ALERTS[idx % INITIAL_FLOOD_ALERTS.length],
-          id: a.id || INITIAL_FLOOD_ALERTS[idx].id,
-          alertType: a.title || a.alertType || INITIAL_FLOOD_ALERTS[idx].alertType,
-          description: a.description || INITIAL_FLOOD_ALERTS[idx].description,
-          severity: a.severity || 'CRITICAL',
-          status: a.status || 'ACTIVE'
-        })), ...nonDuplicateInitial];
-      }
-    }
-    return INITIAL_FLOOD_ALERTS;
-  });
-
-  const [historicalData, setHistoricalData] = useState<HistoricalReading[]>(() =>
-    generateHistoricalData(16)
-  );
-
   const [selectedSensor, setSelectedSensor] = useState<FloodSensor | null>(null);
   const [isLiveStreaming, setIsLiveStreaming] = useState<boolean>(true);
-  const [activeScenario, setActiveScenario] = useState<'SURGE' | 'MODERATE' | 'SAFE'>('SURGE');
   const [alertSeverityFilter, setAlertSeverityFilter] = useState<'ALL' | 'CRITICAL' | 'HIGH'>('ALL');
   const [sensorHealthFilter, setSensorHealthFilter] = useState<'ALL' | 'ONLINE' | 'ALERTING'>('ALL');
 
-  // Focus sensor (Pine River Node Alpha by default, or selected)
-  const focusSensor = selectedSensor || sensors[0] || INITIAL_FLOOD_SENSORS[0];
-  const primaryWaterLevel = focusSensor.waterLevel;
-  const primaryRainfall = focusSensor.rainfallRate;
-  const primaryRiskScore = focusSensor.riskScore;
-  const primaryRiskTier = focusSensor.riskTier;
+  // Derive active focus sensor
+  const activeFocusSensor = selectedSensor || sensors[0];
+
+  // Dynamic classification based on primary telemetry inputs
+  const primaryWaterLevel = activeFocusSensor.waterLevel;
+  const primaryRainfall = activeFocusSensor.rainfallRate;
+  const primaryRiseRate = activeFocusSensor.riseRate;
+  const primarySoilMoisture = activeFocusSensor.soilMoisture;
+
+  const primaryRiskTier = useMemo(
+    () => classifyFloodRisk(primaryWaterLevel, primaryRainfall, primaryRiseRate),
+    [primaryWaterLevel, primaryRainfall, primaryRiseRate]
+  );
+
+  const primaryRiskScore = useMemo(
+    () => calculateRiskScore(primaryWaterLevel, primaryRainfall, primaryRiseRate, primarySoilMoisture),
+    [primaryWaterLevel, primaryRainfall, primaryRiseRate, primarySoilMoisture]
+  );
+
   const riskMeta = RISK_COLORS[primaryRiskTier] || RISK_COLORS.SAFE;
 
-  // Active alerts count
-  const activeAlerts = alerts.filter(a => a.status === 'ACTIVE');
-  const criticalAlertsCount = activeAlerts.filter(a => a.severity === 'CRITICAL').length;
+  // AI 1h to 30h Prediction
+  const prediction = useMemo(
+    () => getAIPrediction(primaryRiskScore, primaryWaterLevel, primaryRainfall, primaryRiseRate),
+    [primaryRiskScore, primaryWaterLevel, primaryRainfall, primaryRiseRate]
+  );
 
-  // AI Prediction & Actions
-  const prediction = getAIPrediction(primaryRiskScore, primaryWaterLevel, primaryRainfall);
-  const recommendedActions = getAIRecommendedActions(primaryRiskTier);
+  // Dynamic AI Recommended Actions strictly based on user rules
+  const recommendedActions = useMemo(
+    () => getAIRecommendedActions(primaryRiskTier),
+    [primaryRiskTier]
+  );
+
+  // Dynamic alerts generated based on current & predicted conditions
+  const [alerts, setAlerts] = useState<FloodAlert[]>(() =>
+    generateDynamicAlerts(primaryRiskTier, prediction, primaryWaterLevel, primaryRainfall)
+  );
+
+  // Synchronize alerts whenever risk or prediction changes
+  useEffect(() => {
+    setAlerts(generateDynamicAlerts(primaryRiskTier, prediction, primaryWaterLevel, primaryRainfall));
+  }, [primaryRiskTier, prediction, primaryWaterLevel, primaryRainfall]);
+
+  // Real-time time series data
+  const [historicalData, setHistoricalData] = useState<HistoricalReading[]>(() =>
+    generateHistoricalData(16, primaryWaterLevel, primaryRainfall)
+  );
 
   // Acknowledge Alert Handler
   const handleAcknowledge = (alertId: string) => {
@@ -114,64 +127,152 @@ export const Dashboard: React.FC<DashboardProps> = ({
     if (propAcknowledge) propAcknowledge(alertId);
   };
 
-  // Scenario Switcher for Hackathon Demonstration
+  /**
+   * Scenario Switcher:
+   * Normal: Generate safe river conditions (water < 2.0m, rain < 10 mm/hr) -> SAFE
+   * Watch: Generate moderate flood-risk conditions (water 2.0-3.5m, rain 10-25 mm/hr) -> WATCH
+   * Surge: Generate severe flood-risk conditions (water > 4.2m, rain > 40 mm/hr) -> DANGER
+   */
   const applyScenario = (scenario: 'SURGE' | 'MODERATE' | 'SAFE') => {
     setActiveScenario(scenario);
-    if (scenario === 'SURGE') {
+
+    if (scenario === 'SAFE') {
+      const newWater = 1.75;
+      const newRain = 5.2;
+      const newRise = 0.02;
+      const newSoil = 36;
+      const newFlow = 55;
+
+      setTelemetry({
+        waterLevel: newWater,
+        rainfallRate: newRain,
+        riseRate: newRise,
+        soilMoisture: newSoil,
+        riverFlowRate: newFlow
+      });
+
+      // Update all sensors to Safe conditions
       setSensors(prev =>
         prev.map(s => {
-          if (s.id === 'SN-FLD-01' || s.id === 'SN-FLD-06') {
-            return { ...s, waterLevel: 4.88, rainfallRate: 52.4, riskScore: 92, riskTier: 'DANGER', status: 'ONLINE' };
-          }
-          if (s.id === 'SN-FLD-02') {
-            return { ...s, waterLevel: 3.92, rainfallRate: 43.0, riskScore: 78, riskTier: 'DANGER', status: 'ONLINE' };
-          }
-          return { ...s, waterLevel: 3.10, rainfallRate: 31.0, riskScore: 52, riskTier: 'WARNING', status: 'ONLINE' };
+          const w = parseFloat((1.4 + Math.random() * 0.45).toFixed(2));
+          const r = parseFloat((3.0 + Math.random() * 4.5).toFixed(1));
+          const t = classifyFloodRisk(w, r, 0.02);
+          const sc = calculateRiskScore(w, r, 0.02, 35);
+          return {
+            ...s,
+            waterLevel: w,
+            rainfallRate: r,
+            riseRate: 0.02,
+            soilMoisture: 35,
+            riverFlowRate: 50,
+            riskTier: t,
+            riskScore: sc
+          };
         })
       );
+
+      setHistoricalData(generateHistoricalData(16, newWater, newRain));
     } else if (scenario === 'MODERATE') {
+      const newWater = 2.95;
+      const newRain = 19.5;
+      const newRise = 0.14;
+      const newSoil = 66;
+      const newFlow = 150;
+
+      setTelemetry({
+        waterLevel: newWater,
+        rainfallRate: newRain,
+        riseRate: newRise,
+        soilMoisture: newSoil,
+        riverFlowRate: newFlow
+      });
+
+      // Update sensors to Watch conditions
       setSensors(prev =>
-        prev.map(s => ({
-          ...s,
-          waterLevel: parseFloat((2.8 + Math.random() * 0.4).toFixed(2)),
-          rainfallRate: parseFloat((18.0 + Math.random() * 8.0).toFixed(1)),
-          riskScore: 48,
-          riskTier: 'WATCH'
-        }))
+        prev.map(s => {
+          const isHigh = s.id === 'SN-FLD-01' || s.id === 'SN-FLD-05';
+          const w = parseFloat((isHigh ? 2.9 + Math.random() * 0.3 : 2.2 + Math.random() * 0.4).toFixed(2));
+          const r = parseFloat((isHigh ? 18.0 + Math.random() * 5.0 : 12.0 + Math.random() * 4.0).toFixed(1));
+          const t = classifyFloodRisk(w, r, 0.12);
+          const sc = calculateRiskScore(w, r, 0.12, 65);
+          return {
+            ...s,
+            waterLevel: w,
+            rainfallRate: r,
+            riseRate: 0.12,
+            soilMoisture: 65,
+            riverFlowRate: 145,
+            riskTier: t,
+            riskScore: sc
+          };
+        })
       );
+
+      setHistoricalData(generateHistoricalData(16, newWater, newRain));
     } else {
+      // SURGE -> DANGER
+      const newWater = 4.82;
+      const newRain = 51.5;
+      const newRise = 0.38;
+      const newSoil = 94;
+      const newFlow = 340;
+
+      setTelemetry({
+        waterLevel: newWater,
+        rainfallRate: newRain,
+        riseRate: newRise,
+        soilMoisture: newSoil,
+        riverFlowRate: newFlow
+      });
+
+      // Update sensors to severe Danger conditions
       setSensors(prev =>
-        prev.map(s => ({
-          ...s,
-          waterLevel: parseFloat((1.6 + Math.random() * 0.5).toFixed(2)),
-          rainfallRate: parseFloat((4.0 + Math.random() * 4.0).toFixed(1)),
-          riskScore: 18,
-          riskTier: 'SAFE'
-        }))
+        prev.map(s => {
+          const isDanger = s.id === 'SN-FLD-01' || s.id === 'SN-FLD-06' || s.id === 'SN-FLD-02';
+          const w = parseFloat((isDanger ? 4.6 + Math.random() * 0.35 : 3.6 + Math.random() * 0.3).toFixed(2));
+          const r = parseFloat((isDanger ? 46.0 + Math.random() * 8.0 : 32.0 + Math.random() * 6.0).toFixed(1));
+          const t = classifyFloodRisk(w, r, 0.35);
+          const sc = calculateRiskScore(w, r, 0.35, 92);
+          return {
+            ...s,
+            waterLevel: w,
+            rainfallRate: r,
+            riseRate: 0.35,
+            soilMoisture: 92,
+            riverFlowRate: 330,
+            riskTier: t,
+            riskScore: sc
+          };
+        })
       );
+
+      setHistoricalData(generateHistoricalData(16, newWater, newRain));
     }
   };
 
-  // Real-Time 3.5s Live Telemetry Stream
+  // Continuous 3.5s Live Telemetry Stream
   useEffect(() => {
     if (!isLiveStreaming) return;
 
     const interval = setInterval(() => {
+      // Small real-time jitter based on scenario
+      const jitterFactor = activeScenario === 'SURGE' ? 0.05 : activeScenario === 'MODERATE' ? 0.03 : 0.02;
+
       setSensors(prev =>
         prev.map(s => {
-          const jitter = (Math.random() - 0.48) * 0.04;
-          const newLevel = Math.max(1.0, parseFloat((s.waterLevel + jitter).toFixed(2)));
-          const rainJitter = (Math.random() - 0.5) * 0.8;
+          const jitter = (Math.random() - 0.48) * jitterFactor;
+          const newLevel = Math.max(0.8, parseFloat((s.waterLevel + jitter).toFixed(2)));
+          const rainJitter = (Math.random() - 0.5) * (jitterFactor * 15);
           const newRain = Math.max(0, parseFloat((s.rainfallRate + rainJitter).toFixed(1)));
-          const newScore = Math.min(100, Math.max(5, Math.round(s.riskScore + (jitter > 0 ? 1 : -1))));
-          const newTier = getRiskTierFromScore(newScore);
+          const newTier = classifyFloodRisk(newLevel, newRain, s.riseRate);
+          const newScore = calculateRiskScore(newLevel, newRain, s.riseRate, s.soilMoisture);
 
           return {
             ...s,
             waterLevel: newLevel,
             rainfallRate: newRain,
-            riskScore: newScore,
             riskTier: newTier,
+            riskScore: newScore,
             lastPing: new Date().toISOString()
           };
         })
@@ -181,9 +282,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
         const now = new Date();
         const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         const last = prev[prev.length - 1];
-        const newWater = parseFloat((last.waterLevel + (Math.random() - 0.48) * 0.05).toFixed(2));
-        const newRain = parseFloat((last.rainfall + (Math.random() - 0.5) * 1.2).toFixed(1));
-        const newScore = Math.min(100, Math.max(10, Math.round(last.riskScore + (Math.random() - 0.48) * 2)));
+        const newWater = parseFloat((last.waterLevel + (Math.random() - 0.48) * jitterFactor).toFixed(2));
+        const newRain = parseFloat((last.rainfall + (Math.random() - 0.5) * (jitterFactor * 10)).toFixed(1));
+        const newScore = calculateRiskScore(newWater, newRain);
 
         return [...prev.slice(1), {
           timestamp: timeStr,
@@ -195,15 +296,52 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }, 3500);
 
     return () => clearInterval(interval);
-  }, [isLiveStreaming]);
+  }, [isLiveStreaming, activeScenario]);
 
-  // Filtered Alerts
+  // Dynamic text generators for Top Summary Cards
+  const getRainfallSubtitle = (rain: number) => {
+    if (rain >= 40) return { title: 'Torrential Downpour', accum: '24h: 114.2mm' };
+    if (rain >= 25) return { title: 'Heavy Rainfall', accum: '24h: 84.5mm' };
+    if (rain >= 10) return { title: 'Moderate Rain', accum: '24h: 46.8mm' };
+    return { title: 'Light Precipitation', accum: '24h: 12.4mm' };
+  };
+
+  const getWaterLevelSubtitle = (rise: number) => {
+    if (rise >= 0.30) return 'Rapid Upstream Inflow';
+    if (rise >= 0.15) return 'Steady Stage Elevation';
+    if (rise >= 0.05) return 'Moderate Inflow';
+    return 'Stable Channel Conditions';
+  };
+
+  const getDisasterResponseText = (tier: string) => {
+    if (tier === 'DANGER') return 'PHASE-II ACTIVE';
+    if (tier === 'WARNING') return 'TACTICAL STANDBY';
+    if (tier === 'WATCH') return 'HEIGHTENED WATCH';
+    return 'ROUTINE MONITORING';
+  };
+
+  const getSoilMoistureText = (moisture: number) => {
+    if (moisture >= 85) return `${moisture}% Extreme`;
+    if (moisture >= 65) return `${moisture}% High`;
+    if (moisture >= 45) return `${moisture}% Moderate`;
+    return `${moisture}% Nominal`;
+  };
+
+  const rainInfo = getRainfallSubtitle(primaryRainfall);
+  const waterSubtitle = getWaterLevelSubtitle(primaryRiseRate);
+  const disasterResponse = getDisasterResponseText(primaryRiskTier);
+  const soilMoistureDisplay = getSoilMoistureText(primarySoilMoisture);
+
+  // Active alerts count
+  const activeAlerts = alerts.filter(a => a.status === 'ACTIVE');
+  const criticalAlertsCount = activeAlerts.filter(a => a.severity === 'CRITICAL').length;
+  const warningAlertsCount = activeAlerts.filter(a => a.severity === 'HIGH' || a.severity === 'MODERATE').length;
+
   const filteredAlerts = alerts.filter(a => {
     if (alertSeverityFilter === 'ALL') return true;
     return a.severity === alertSeverityFilter;
   });
 
-  // Filtered Sensors for Health Monitoring
   const filteredSensors = sensors.filter(s => {
     if (sensorHealthFilter === 'ALL') return true;
     if (sensorHealthFilter === 'ONLINE') return s.status === 'ONLINE';
@@ -226,6 +364,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
       },
       aiPrediction: {
         confidence: `${prediction.confidence}%`,
+        currentRisk: prediction.currentRisk,
+        predictedRisk24h: prediction.predictedRisk24h,
         reason: prediction.reason,
         peakCrestForecast: `${prediction.projectedPeakLevel}m at ${prediction.projectedPeakTime}`,
       },
@@ -275,11 +415,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
 
-        {/* Hackathon Scenario Controls & Live Stream Toggle */}
+        {/* Existing Simulation Buttons: Surge, Watch, Normal */}
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center bg-slate-950/90 p-1.5 rounded-xl border border-white/10 text-xs shadow-inner">
             <span className="text-[11px] text-slate-400 uppercase px-2 font-bold flex items-center gap-1.5">
-              <Sliders size={13} className="text-cyan-400" /> Simulation:
+              <Sliders size={13} className="text-cyan-400" /> SIMULATION:
             </span>
             <button
               onClick={() => applyScenario('SURGE')}
@@ -328,15 +468,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* Emergency Phase-2 Evacuation Notice Banner */}
-      {(primaryRiskTier === 'DANGER' || primaryRiskTier === 'WARNING') && (
-        <div
-          className="p-4 rounded-xl border flex flex-wrap items-center justify-between gap-4 shadow-xl"
-          style={{
-            background: primaryRiskTier === 'DANGER' ? 'rgba(239, 68, 68, 0.16)' : 'rgba(249, 115, 22, 0.16)',
-            borderColor: primaryRiskTier === 'DANGER' ? 'rgba(239, 68, 68, 0.55)' : 'rgba(249, 115, 22, 0.55)'
-          }}
-        >
+      {/* Dynamic Alert Banner: Automatically updates to match active risk state */}
+      {primaryRiskTier === 'DANGER' && (
+        <div className="p-4 rounded-xl border flex flex-wrap items-center justify-between gap-4 shadow-xl bg-red-500/15 border-red-500/55">
           <div className="flex items-center gap-3.5">
             <div className="p-2.5 rounded-lg bg-red-500/25 text-red-400 animate-bounce">
               <ShieldAlert size={24} />
@@ -355,6 +489,78 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
           <span className="px-3 py-1.5 rounded-lg text-xs font-black bg-red-600 text-white animate-pulse shadow-md">
             RED ALERT CODE #882
+          </span>
+        </div>
+      )}
+
+      {primaryRiskTier === 'WARNING' && (
+        <div className="p-4 rounded-xl border flex flex-wrap items-center justify-between gap-4 shadow-xl bg-orange-500/15 border-orange-500/50">
+          <div className="flex items-center gap-3.5">
+            <div className="p-2.5 rounded-lg bg-orange-500/25 text-orange-400">
+              <AlertTriangle size={24} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black uppercase text-orange-400 tracking-wider">
+                  ⚠️ FLOOD WARNING ADVISORY · Rapid River Rise Detected
+                </span>
+                <span className="text-xs text-slate-400">· Emergency Response Standby</span>
+              </div>
+              <p className="text-xs text-slate-200 mt-1">
+                Water level reached <strong>{primaryWaterLevel.toFixed(2)}m</strong> (approaching 4.20m danger limit). Quick-response boat squads and mobile pumps placed on 15-minute standby.
+              </p>
+            </div>
+          </div>
+          <span className="px-3 py-1.5 rounded-lg text-xs font-black bg-orange-600 text-white shadow-md">
+            ORANGE ALERT CODE #540
+          </span>
+        </div>
+      )}
+
+      {primaryRiskTier === 'WATCH' && (
+        <div className="p-4 rounded-xl border flex flex-wrap items-center justify-between gap-4 shadow-xl bg-amber-500/10 border-amber-500/40">
+          <div className="flex items-center gap-3.5">
+            <div className="p-2.5 rounded-lg bg-amber-500/20 text-amber-400">
+              <Info size={24} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black uppercase text-amber-400 tracking-wider">
+                  ℹ️ HYDROLOGICAL WATCH NOTICE · Catchment Precipitation Advisory
+                </span>
+                <span className="text-xs text-slate-400">· Monitoring Polling Accelerated</span>
+              </div>
+              <p className="text-xs text-slate-200 mt-1">
+                River stage elevated to <strong>{primaryWaterLevel.toFixed(2)}m</strong> with rainfall rate <strong>{primaryRainfall.toFixed(1)} mm/h</strong>. Polling frequency increased to 1-minute automated sync.
+              </p>
+            </div>
+          </div>
+          <span className="px-3 py-1.5 rounded-lg text-xs font-black bg-amber-600 text-white shadow-md">
+            YELLOW WATCH CODE #210
+          </span>
+        </div>
+      )}
+
+      {primaryRiskTier === 'SAFE' && (
+        <div className="p-4 rounded-xl border flex flex-wrap items-center justify-between gap-4 shadow-xl bg-emerald-500/10 border-emerald-500/35">
+          <div className="flex items-center gap-3.5">
+            <div className="p-2.5 rounded-lg bg-emerald-500/20 text-emerald-400">
+              <ShieldCheck size={24} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black uppercase text-emerald-400 tracking-wider">
+                  ✓ ALL BASIN SECTORS NOMINAL · Continuous AI Surveillance Active
+                </span>
+                <span className="text-xs text-slate-400">· Seasonal Hydrological Baseline</span>
+              </div>
+              <p className="text-xs text-slate-200 mt-1">
+                Current water level <strong>{primaryWaterLevel.toFixed(2)}m</strong> and rainfall rate <strong>{primaryRainfall.toFixed(1)} mm/h</strong> remain well below watch thresholds.
+              </p>
+            </div>
+          </div>
+          <span className="px-3 py-1.5 rounded-lg text-xs font-black bg-emerald-600 text-white shadow-md">
+            ALL NOMINAL CODE #100
           </span>
         </div>
       )}
@@ -400,14 +606,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <span className="text-sm font-semibold text-slate-400">meters</span>
               </div>
               <div className="flex items-center gap-2 text-xs font-semibold text-cyan-400 mt-1">
-                <span>▲ +0.34 m/hr</span>
-                <span className="text-slate-500">· Rapid Upstream Inflow</span>
+                <span>▲ +{primaryRiseRate.toFixed(2)} m/hr</span>
+                <span className="text-slate-500">· {waterSubtitle}</span>
               </div>
             </div>
 
             <div className="text-xs text-slate-400 pt-2.5 border-t border-white/5 flex justify-between">
               <span>Danger Limit:</span>
-              <strong className="text-red-400 font-mono">{focusSensor.floodThreshold.toFixed(2)}m</strong>
+              <strong className="text-red-400 font-mono">{activeFocusSensor.floodThreshold.toFixed(2)}m</strong>
             </div>
           </div>
 
@@ -440,14 +646,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <span className="text-sm font-semibold text-slate-400">mm/hr</span>
               </div>
               <div className="flex items-center gap-2 text-xs font-semibold text-indigo-400 mt-1">
-                <span>Torrential Downpour</span>
-                <span className="text-slate-500">· 24h: 114.2mm</span>
+                <span>{rainInfo.title}</span>
+                <span className="text-slate-500">· {rainInfo.accum}</span>
               </div>
             </div>
 
             <div className="text-xs text-slate-400 pt-2.5 border-t border-white/5 flex justify-between">
               <span>Runoff Saturation:</span>
-              <strong className="text-amber-400 font-mono">92% Extreme</strong>
+              <strong className="text-amber-400 font-mono">{soilMoistureDisplay}</strong>
             </div>
           </div>
 
@@ -488,14 +694,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 {primaryRiskTier === 'DANGER'
                   ? 'Severe Inundation Imminent'
                   : primaryRiskTier === 'WARNING'
-                  ? 'High Spillway Warning'
+                  ? 'Spillway & River Surge Warning'
+                  : primaryRiskTier === 'WATCH'
+                  ? 'Heightened Basin Watch'
                   : 'Catchment Flow Nominal'}
               </div>
             </div>
 
             <div className="text-xs text-slate-400 pt-2.5 border-t border-white/5 flex justify-between">
               <span>Disaster Response:</span>
-              <strong style={{ color: riskMeta.text }} className="font-semibold">PHASE-II ACTIVE</strong>
+              <strong style={{ color: riskMeta.text }} className="font-semibold">{disasterResponse}</strong>
             </div>
           </div>
 
@@ -528,7 +736,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <span className="text-sm font-semibold text-slate-400">Active Incidents</span>
               </div>
               <div className="text-xs text-red-300 mt-1">
-                <strong>{criticalAlertsCount} Critical Hazards</strong> · {activeAlerts.length - criticalAlertsCount} Warning
+                <strong>{criticalAlertsCount} Critical Hazards</strong> · {warningAlertsCount} Warning
               </div>
             </div>
 
@@ -548,12 +756,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
           score={primaryRiskScore}
           tier={primaryRiskTier}
           waterLevel={primaryWaterLevel}
-          rateOfRise={0.34}
+          rateOfRise={primaryRiseRate}
         />
       </div>
 
       {/* ========================================================
-          SECTION 3: AI FLOOD PREDICTION PANEL (6-HR FORECAST)
+          SECTION 3: AI FLOOD PREDICTION PANEL (1h to 30h FORECAST)
          ======================================================== */}
       <div>
         <AIPredictionPanel prediction={prediction} />
@@ -565,8 +773,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
       <div>
         <Charts
           historicalData={historicalData}
-          floodThreshold={focusSensor.floodThreshold}
-          warningThreshold={focusSensor.warningThreshold}
+          floodThreshold={activeFocusSensor.floodThreshold}
+          warningThreshold={activeFocusSensor.warningThreshold}
           heavyRainThreshold={35.0}
         />
       </div>
@@ -659,7 +867,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           {filteredAlerts.length === 0 ? (
             <div className="p-8 rounded-xl bg-slate-900/50 border border-white/5 text-center text-slate-400 text-sm">
               <CheckCircle2 size={28} className="text-emerald-400 mx-auto mb-2" />
-              No hazard alerts matching filter. All monitored sectors nominal.
+              No active alerts matching filter. All monitored sectors nominal.
             </div>
           ) : (
             filteredAlerts.map(alert => (
@@ -747,7 +955,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <SensorCard
               key={sensor.id}
               sensor={sensor}
-              isSelected={selectedSensor?.id === sensor.id}
+              isSelected={activeFocusSensor.id === sensor.id}
               onSelect={setSelectedSensor}
             />
           ))}
