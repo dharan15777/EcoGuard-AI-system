@@ -1,91 +1,117 @@
 import React, { useState } from 'react';
 import { convertGeoToPixelPercent } from '../utils/mapHelpers';
-import { Layers, ZoomIn, ZoomOut, Compass, Navigation } from 'lucide-react';
+import { Layers, Compass, X } from 'lucide-react';
+
+const TYPE_COLORS = {
+  'FLOOD_WATER_LEVEL':       '#4a8fa8',
+  'WILDFIRE_THERMAL':        '#c84040',
+  'AIR_QUALITY_AQI':         '#9a7ec8',
+  'LANDSLIDE_SOIL_MOISTURE': '#c47e35',
+  'METEOROLOGICAL':          '#5a8a4a',
+};
 
 export const Map = ({ sensors = [], alerts = [], onSelectSensor }) => {
   const [selectedNode, setSelectedNode] = useState(null);
-  const [mapLayer, setMapLayer] = useState('hazard'); // hazard, satellite, topo
+  const [layer, setLayer] = useState('topo');
 
   const handlePinClick = (sensor) => {
-    setSelectedNode(sensor);
+    setSelectedNode(sensor.id === selectedNode?.id ? null : sensor);
     if (onSelectSensor) onSelectSensor(sensor);
   };
 
   return (
     <div className="map-container">
-      {/* Map Control Bar */}
+
+      {/* Control Bar */}
       <div style={{
-        position: 'absolute',
-        top: '16px',
-        left: '16px',
-        zIndex: 20,
-        display: 'flex',
-        gap: '8px'
+        position: 'absolute', top: '12px', left: '12px', zIndex: 20,
+        display: 'flex', gap: '8px'
       }}>
+        {/* Zone label */}
         <div style={{
-          background: 'rgba(15, 23, 42, 0.85)',
-          backdropFilter: 'blur(8px)',
-          border: '1px solid var(--border-glass)',
-          borderRadius: '10px',
-          padding: '6px 12px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          fontSize: '0.8rem',
-          fontWeight: '600'
+          background: 'rgba(12,17,11,0.9)',
+          border: '1px solid var(--border-raw)',
+          borderRadius: '5px',
+          padding: '5px 12px',
+          display: 'flex', alignItems: 'center', gap: '7px',
+          fontSize: '0.68rem', fontWeight: '600',
+          fontFamily: 'var(--font-mono)',
+          color: 'var(--text-secondary)',
+          letterSpacing: '0.06em',
+          backdropFilter: 'blur(6px)',
         }}>
-          <Navigation size={14} color="#10b981" />
-          <span>Interactive GIS Grid • San Francisco Bay & Sierra Foothills</span>
+          <Compass size={13} color="var(--moss-light)" />
+          BAY-DELTA · SF FOOTHILLS
         </div>
 
-        <button 
-          onClick={() => setMapLayer(mapLayer === 'hazard' ? 'satellite' : 'hazard')}
+        {/* Layer toggle */}
+        <button
+          onClick={() => setLayer(l => l === 'topo' ? 'satellite' : 'topo')}
           style={{
-            background: 'rgba(15, 23, 42, 0.85)',
-            border: '1px solid var(--border-glass)',
-            color: '#fff',
-            padding: '6px 12px',
-            borderRadius: '10px',
-            fontSize: '0.78rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
+            background: 'rgba(12,17,11,0.9)',
+            border: '1px solid var(--border-raw)',
+            color: 'var(--text-secondary)',
+            padding: '5px 10px',
+            borderRadius: '5px',
+            fontSize: '0.65rem',
+            fontFamily: 'var(--font-mono)',
+            display: 'flex', alignItems: 'center', gap: '5px',
+            backdropFilter: 'blur(6px)',
+            letterSpacing: '0.06em',
           }}
         >
-          <Layers size={14} /> Layer: {mapLayer.toUpperCase()}
+          <Layers size={12} /> {layer.toUpperCase()}
         </button>
       </div>
 
-      {/* Map Visual Simulation Canvas */}
-      <div className="mock-map-canvas">
-        {/* River & Mountain vector terrain contours */}
-        <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0.25, pointerEvents: 'none' }}>
-          <path d="M 0,220 Q 250,180 400,280 T 800,240 T 1200,320" fill="none" stroke="#06b6d4" strokeWidth="6" strokeDasharray="4 2" />
-          <path d="M 100,50 Q 300,120 600,80 T 1000,140" fill="none" stroke="#10b981" strokeWidth="2" />
-          <polygon points="650,100 780,240 590,260" fill="rgba(239, 68, 68, 0.08)" stroke="rgba(239, 68, 68, 0.3)" />
+      {/* Map Canvas */}
+      <div className="mock-map-canvas" style={{
+        background: layer === 'topo'
+          ? 'linear-gradient(160deg, #161e14 0%, #1a2518 40%, #131b11 100%)'
+          : 'linear-gradient(160deg, #0e1510 0%, #1c251a 40%, #111810 100%)',
+      }}>
+
+        {/* Topographic SVG terrain */}
+        <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0.18, pointerEvents: 'none' }}>
+          {/* Elevation contours */}
+          {[0.15, 0.28, 0.42, 0.56, 0.7, 0.84].map((r, i) => (
+            <ellipse key={i} cx="65%" cy="45%" rx={`${r * 55}%`} ry={`${r * 38}%`}
+              stroke="#82b460" strokeWidth="0.8" fill="none" />
+          ))}
+          {/* River channel */}
+          <path d="M 0,65% Q 25%,55% 42%,68% T 75%,62% T 100%,72%"
+            fill="none" stroke="#4a8fa8" strokeWidth="3" strokeDasharray="6 3" opacity="0.6" />
+          {/* Mountain ridge */}
+          <path d="M 55%,20% L 65%,40% L 75%,22% L 85%,45%"
+            fill="none" stroke="#8a9e8a" strokeWidth="1.5" opacity="0.5" />
         </svg>
 
-        {/* Hazard Zone Overlay */}
-        <div style={{
-          position: 'absolute',
-          top: '38%',
-          left: '32%',
-          width: '180px',
-          height: '180px',
-          borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(239, 68, 68, 0.25) 0%, rgba(239, 68, 68, 0.05) 70%, transparent 100%)',
-          border: '1px dashed rgba(239, 68, 68, 0.5)',
-          pointerEvents: 'none'
-        }}>
-          <span style={{ position: 'absolute', top: '10px', left: '20px', fontSize: '0.65rem', color: '#f87171', fontWeight: 'bold' }}>
-            WILDFIRE SPREAD RISK PERIMETER
-          </span>
-        </div>
+        {/* Fire zone overlay */}
+        {alerts.some(a => a.hazardType === 'WILDFIRE') && (
+          <div style={{
+            position: 'absolute', top: '34%', left: '38%',
+            width: '160px', height: '120px',
+            borderRadius: '50%',
+            background: 'radial-gradient(ellipse, rgba(200,64,64,0.18) 0%, transparent 70%)',
+            border: '1px dashed rgba(200,64,64,0.45)',
+            pointerEvents: 'none',
+          }}>
+            <span style={{
+              position: 'absolute', top: '8px', left: '50%', transform: 'translateX(-50%)',
+              fontSize: '0.55rem', color: 'rgba(200,100,80,0.9)', fontFamily: 'var(--font-mono)',
+              whiteSpace: 'nowrap', letterSpacing: '0.08em', fontWeight: '700'
+            }}>
+              FIRE PERIMETER
+            </span>
+          </div>
+        )}
 
-        {/* Render Interactive Sensor Pins */}
-        {sensors.map((sensor) => {
-          const coords = convertGeoToPixelPercent(sensor.latitude, sensor.longitude);
-          const isAlerting = sensor.status === 'ALERTING' || sensor.riskScore > 0.7;
+        {/* Sensor Pins */}
+        {sensors.map(sensor => {
+          const coords    = convertGeoToPixelPercent(sensor.latitude, sensor.longitude);
+          const isAlert   = sensor.status === 'ALERTING' || (sensor.riskScore ?? 0) > 0.7;
+          const isSelected = selectedNode?.id === sensor.id;
+          const pinColor  = isAlert ? 'var(--crimson)' : TYPE_COLORS[sensor.type] || 'var(--moss-light)';
 
           return (
             <div
@@ -94,56 +120,85 @@ export const Map = ({ sensors = [], alerts = [], onSelectSensor }) => {
               style={{ left: `${coords.x}%`, top: `${coords.y}%` }}
               onClick={() => handlePinClick(sensor)}
             >
-              <div className={`pin-dot ${isAlerting ? 'pulse-alert' : ''}`} />
-              <div className="pin-label">
-                {sensor.name}
+              {/* Outer ring (alert pulse) */}
+              {isAlert && (
+                <div style={{
+                  position: 'absolute', inset: '-6px',
+                  borderRadius: '50%',
+                  border: `1.5px solid ${pinColor}`,
+                  animation: 'pulse-dot 1s ease-in-out infinite',
+                  opacity: 0.5,
+                }} />
+              )}
+              {/* Pin dot */}
+              <div style={{
+                width: isSelected ? '14px' : '10px',
+                height: isSelected ? '14px' : '10px',
+                borderRadius: '50%',
+                background: pinColor,
+                border: `2px solid ${isSelected ? '#fff' : 'rgba(0,0,0,0.5)'}`,
+                boxShadow: `0 0 ${isAlert ? 10 : 6}px ${pinColor}`,
+                transition: 'all 0.2s ease',
+                cursor: 'pointer',
+                zIndex: 2,
+                position: 'relative',
+              }} />
+              {/* Label */}
+              <div className="pin-label" style={{
+                background: 'rgba(10,14,10,0.9)',
+                border: `1px solid ${pinColor}44`,
+                color: 'var(--text-secondary)',
+                fontSize: '0.6rem',
+                fontFamily: 'var(--font-mono)',
+                padding: '2px 6px',
+                borderRadius: '3px',
+                letterSpacing: '0.04em',
+                whiteSpace: 'nowrap',
+              }}>
+                {sensor.id}
               </div>
             </div>
           );
         })}
       </div>
 
-      {/* Detail Overlay Card if clicked */}
+      {/* Detail Card */}
       {selectedNode && (
         <div style={{
-          position: 'absolute',
-          bottom: '20px',
-          right: '20px',
-          width: '280px',
-          background: 'rgba(15, 23, 42, 0.95)',
-          backdropFilter: 'blur(16px)',
-          border: '1px solid var(--border-glass-active)',
-          borderRadius: '12px',
-          padding: '16px',
+          position: 'absolute', bottom: '14px', right: '14px',
+          width: '260px',
+          background: 'rgba(14,18,13,0.97)',
+          border: '1px solid var(--border-active)',
+          borderRadius: '7px',
+          padding: '14px',
           zIndex: 30,
-          boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
+          boxShadow: 'var(--shadow-glow-moss)',
+          backdropFilter: 'blur(12px)',
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <h4 style={{ fontSize: '0.9rem', fontWeight: '700', color: '#fff' }}>{selectedNode.name}</h4>
-            <button 
-              onClick={() => setSelectedNode(null)}
-              style={{ background: 'transparent', color: '#94a3b8', fontSize: '1rem', cursor: 'pointer' }}
-            >
-              ✕
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+            <div>
+              <div style={{ fontSize: '0.88rem', fontWeight: '600', color: 'var(--text-primary)', lineHeight: 1.2 }}>
+                {selectedNode.name}
+              </div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: '2px', letterSpacing: '0.05em' }}>
+                {selectedNode.id}
+              </div>
+            </div>
+            <button onClick={() => setSelectedNode(null)} style={{ color: 'var(--text-muted)', padding: '2px' }}>
+              <X size={14} />
             </button>
           </div>
-          <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginTop: '2px' }}>
-            {selectedNode.id} • Lat: {selectedNode.latitude.toFixed(4)}, Lng: {selectedNode.longitude.toFixed(4)}
-          </p>
-          <div style={{ marginTop: '10px', fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--text-secondary)' }}>Status:</span>
-              <strong style={{ color: selectedNode.status === 'ONLINE' ? '#34d399' : '#f43f5e' }}>{selectedNode.status}</strong>
+          {[
+            { label: 'STATUS',   value: selectedNode.status, color: selectedNode.status === 'ONLINE' ? 'var(--moss-light)' : 'var(--crimson)' },
+            { label: 'BATTERY',  value: `${selectedNode.batteryLevel || 95}%`, color: 'var(--text-primary)' },
+            { label: 'COORDS',   value: `${selectedNode.latitude?.toFixed(4)}, ${selectedNode.longitude?.toFixed(4)}`, color: 'var(--river-light)' },
+            { label: 'FIRMWARE', value: selectedNode.firmwareVersion || 'v2.4.1', color: 'var(--text-secondary)' },
+          ].map((row, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: i < 3 ? '1px solid var(--border-raw)' : 'none' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', color: 'var(--text-muted)', letterSpacing: '0.07em' }}>{row.label}</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.73rem', color: row.color, fontWeight: '600' }}>{row.value}</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--text-secondary)' }}>Battery Reserve:</span>
-              <strong>{selectedNode.batteryLevel || 95}%</strong>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--text-secondary)' }}>Edge AI Model:</span>
-              <span style={{ fontFamily: 'var(--font-mono)', color: '#38bdf8' }}>{selectedNode.edgeAiModel || 'flood_v1.tflite'}</span>
-            </div>
-          </div>
+          ))}
         </div>
       )}
     </div>

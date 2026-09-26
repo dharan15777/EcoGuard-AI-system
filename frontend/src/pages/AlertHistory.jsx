@@ -1,37 +1,57 @@
 import React, { useState } from 'react';
-import { AlertTriangle, Filter, CheckCircle2, History, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, Filter } from 'lucide-react';
 import { AlertNotification } from '../components/AlertNotification';
+
+const SEVERITY_FILTERS = ['ALL', 'CRITICAL', 'HIGH', 'MODERATE'];
 
 export const AlertHistory = ({ alerts = [], onAcknowledgeAlert }) => {
   const [filterSeverity, setFilterSeverity] = useState('ALL');
 
-  const filtered = filterSeverity === 'ALL' 
-    ? alerts 
+  const filtered = filterSeverity === 'ALL'
+    ? alerts
     : alerts.filter(a => a.severity === filterSeverity);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '14px' }}>
         <div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: '800', color: '#fff' }}>Emergency Alert Broadcast History</h2>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-            Complete audit trail of AI model hazard detections, dispatches, and operator resolutions
+          <div className="overline" style={{ marginBottom: '4px' }}>Dispatch Log</div>
+          <h2 style={{ fontSize: '1.35rem', fontWeight: '700', color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+            Alert Broadcast History
+          </h2>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+            Complete audit trail of hazard detections, operator dispatches, and resolutions.
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px' }}>
-          {['ALL', 'CRITICAL', 'HIGH', 'MODERATE'].map(sev => (
+        {/* Severity filter */}
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          <Filter size={14} color="var(--text-muted)" />
+          {SEVERITY_FILTERS.map(sev => (
             <button
               key={sev}
               onClick={() => setFilterSeverity(sev)}
               style={{
-                padding: '6px 14px',
-                borderRadius: '8px',
-                fontSize: '0.78rem',
+                padding: '5px 12px',
+                borderRadius: '4px',
+                fontSize: '0.68rem',
                 fontWeight: '700',
-                background: filterSeverity === sev ? '#f43f5e' : 'rgba(255,255,255,0.05)',
-                color: '#fff',
-                border: '1px solid var(--border-glass)'
+                fontFamily: 'var(--font-mono)',
+                letterSpacing: '0.07em',
+                background: filterSeverity === sev
+                  ? sev === 'CRITICAL' ? 'rgba(200,64,64,0.2)'
+                  : sev === 'HIGH'     ? 'rgba(196,126,53,0.2)'
+                  : 'rgba(90,138,74,0.2)'
+                  : 'rgba(255,255,255,0.04)',
+                color: filterSeverity === sev
+                  ? sev === 'CRITICAL' ? 'var(--crimson)'
+                  : sev === 'HIGH'     ? 'var(--amber-light)'
+                  : 'var(--moss-light)'
+                  : 'var(--text-muted)',
+                border: filterSeverity === sev ? '1px solid currentColor' : '1px solid var(--border-raw)',
+                transition: 'all 0.2s ease',
               }}
             >
               {sev}
@@ -40,10 +60,28 @@ export const AlertHistory = ({ alerts = [], onAcknowledgeAlert }) => {
         </div>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        {filtered.map(alert => (
-          <AlertNotification key={alert.id} alert={alert} onAcknowledge={onAcknowledgeAlert} />
-        ))}
+      {/* Count summary */}
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+        Showing <span style={{ color: 'var(--text-secondary)' }}>{filtered.length}</span> of{' '}
+        <span style={{ color: 'var(--text-secondary)' }}>{alerts.length}</span> records
+      </div>
+
+      {/* Alert list */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        {filtered.length === 0 ? (
+          <div className="field-panel" style={{ padding: '36px', textAlign: 'center' }}>
+            <div style={{ fontSize: '0.85rem', color: 'var(--moss-light)', fontFamily: 'var(--font-mono)', letterSpacing: '0.05em' }}>
+              ✓ NO RECORDS MATCH THIS FILTER
+            </div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '6px' }}>
+              Try a different severity level or check All.
+            </div>
+          </div>
+        ) : (
+          filtered.map(alert => (
+            <AlertNotification key={alert.id} alert={alert} onAcknowledge={onAcknowledgeAlert} />
+          ))
+        )}
       </div>
     </div>
   );

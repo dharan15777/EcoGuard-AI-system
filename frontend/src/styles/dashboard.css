@@ -1,85 +1,103 @@
+/* ── Layout ─────────────────────────────────────────────────────── */
 .app-layout {
   display: flex;
-  min-height: 100vh;
+  min-height: calc(100vh - 60px);
 }
 
 .main-content {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 24px;
-  gap: 24px;
+  padding: 28px;
+  gap: 28px;
   overflow-y: auto;
-  max-width: 1600px;
+  max-width: 1700px;
   margin: 0 auto;
+  width: 100%;
 }
 
+/* ── KPI row ─────────────────────────────────────────────────────── */
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
 }
 
 .kpi-card {
-  padding: 20px;
+  padding: 20px 20px 20px 24px;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 18px;
   position: relative;
   overflow: hidden;
 }
 
+/* Thick left accent bar */
 .kpi-card::before {
   content: '';
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 4px;
+  top: 0; left: 0;
+  width: 3px;
   height: 100%;
-  background: var(--accent-emerald);
+  background: var(--moss-light);
+  border-radius: 3px 0 0 3px;
 }
 
-.kpi-card.alert-card::before {
-  background: var(--accent-rose);
-}
+.kpi-card.warn::before  { background: var(--amber); }
+.kpi-card.crit::before  { background: var(--crimson); }
+.kpi-card.river::before { background: var(--river); }
 
-.kpi-icon-wrapper {
-  width: 52px;
-  height: 52px;
-  border-radius: 12px;
-  background: rgba(16, 185, 129, 0.1);
+.kpi-icon-wrap {
+  width: 46px;
+  height: 46px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--accent-emerald);
-}
-
-.kpi-card.alert-card .kpi-icon-wrapper {
-  background: rgba(244, 63, 94, 0.1);
-  color: var(--accent-rose);
+  flex-shrink: 0;
 }
 
 .kpi-value {
-  font-size: 1.8rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
   font-family: var(--font-mono);
+  line-height: 1;
+  color: var(--text-primary);
 }
 
 .kpi-label {
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   color: var(--text-secondary);
   font-weight: 500;
+  margin-top: 4px;
+  letter-spacing: 0.01em;
 }
 
+/* ── Dashboard split ─────────────────────────────────────────────── */
 .dashboard-split {
   display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 24px;
+  grid-template-columns: 1.8fr 1fr;
+  gap: 20px;
 }
 
+/* ── Sensor grid ─────────────────────────────────────────────────── */
 .sensor-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+/* ── Progress bar ────────────────────────────────────────────────── */
+.prog-bar-track {
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.07);
+  overflow: hidden;
+}
+
+.prog-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease;
 }

@@ -1,92 +1,122 @@
 import React from 'react';
-import { Activity, Battery, Radio, ShieldCheck, AlertCircle, Droplets, Flame, Wind, Mountain } from 'lucide-react';
-import { getSeverityClass } from '../utils/formatters';
+import { Droplets, Flame, Wind, Mountain, Activity, Battery, Radio } from 'lucide-react';
+
+const TYPE_META = {
+  'FLOOD_WATER_LEVEL':      { icon: Droplets,  label: 'Hydrology',     color: '#4a8fa8', bg: 'rgba(74,143,168,0.12)',  unit: 'm',    key: 'waterLevel'  },
+  'WILDFIRE_THERMAL':       { icon: Flame,     label: 'Thermal',       color: '#c84040', bg: 'rgba(200,64,64,0.12)',   unit: '°C',   key: 'temperature' },
+  'AIR_QUALITY_AQI':        { icon: Wind,      label: 'Air Quality',   color: '#9a7ec8', bg: 'rgba(154,126,200,0.12)', unit: 'AQI',  key: 'pm25'        },
+  'LANDSLIDE_SOIL_MOISTURE':{ icon: Mountain,  label: 'Geotechnical',  color: '#c47e35', bg: 'rgba(196,126,53,0.12)',  unit: '%',    key: 'soilMoisture'},
+  'METEOROLOGICAL':         { icon: Activity,  label: 'Meteorology',   color: '#5a8a4a', bg: 'rgba(90,138,74,0.12)',   unit: '',     key: null          },
+};
+
+const getStatusStyle = (status) => {
+  if (status === 'ALERTING') return { dot: 'alerting', badge: 'badge badge-critical', text: 'HAZARD' };
+  if (status === 'OFFLINE')  return { dot: 'offline',  badge: 'badge badge-moderate', text: 'OFFLINE' };
+  return { dot: 'online', badge: 'badge badge-low', text: 'NOMINAL' };
+};
 
 export const SensorCard = ({ sensor, onSelect }) => {
-  const isAlerting = sensor.status === 'ALERTING' || sensor.riskScore > 0.7;
+  const meta = TYPE_META[sensor.type] || TYPE_META['METEOROLOGICAL'];
+  const Icon = meta.icon;
+  const st = getStatusStyle(sensor.status);
+  const isAlerting = sensor.status === 'ALERTING';
 
-  const getTypeIcon = (type) => {
-    switch (type) {
-      case 'FLOOD_WATER_LEVEL': return <Droplets size={18} color="#06b6d4" />;
-      case 'WILDFIRE_THERMAL': return <Flame size={18} color="#ef4444" />;
-      case 'AIR_QUALITY_AQI': return <Wind size={18} color="#a855f7" />;
-      case 'LANDSLIDE_SOIL_MOISTURE': return <Mountain size={18} color="#f59e0b" />;
-      default: return <Activity size={18} color="#10b981" />;
-    }
-  };
+  // Get main metric value
+  const rawVal = sensor.telemetry?.[meta.key];
+  const displayVal = sensor.val || (rawVal !== undefined ? `${rawVal}${meta.unit}` : '—');
+
+  // Risk bar percentage (0-100)
+  const riskPct = sensor.riskScore !== undefined ? Math.round(sensor.riskScore * 100) : 12;
+  const riskColor = riskPct > 75 ? 'var(--crimson)' : riskPct > 45 ? 'var(--amber)' : 'var(--moss-light)';
 
   return (
-    <div 
-      className="glass-panel"
+    <div
+      className="field-panel"
       onClick={() => onSelect && onSelect(sensor)}
       style={{
-        padding: '20px',
+        padding: '18px',
         cursor: 'pointer',
+        borderColor: isAlerting ? 'var(--border-crit)' : 'var(--border-raw)',
+        boxShadow: isAlerting ? 'var(--shadow-glow-crit)' : 'none',
         position: 'relative',
         overflow: 'hidden',
-        border: isAlerting ? '1px solid rgba(244, 63, 94, 0.4)' : '1px solid var(--border-glass)',
-        boxShadow: isAlerting ? '0 0 20px rgba(244, 63, 94, 0.15)' : 'none'
+        transition: 'all 0.25s ease'
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+      {/* Top: type icon + name + status */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '14px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{
-            width: '36px',
-            height: '36px',
-            borderRadius: '10px',
-            background: 'rgba(255,255,255,0.05)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
+            width: '38px', height: '38px', borderRadius: '6px',
+            background: meta.bg,
+            border: `1px solid ${meta.color}33`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0
           }}>
-            {getTypeIcon(sensor.type)}
+            <Icon size={18} color={meta.color} />
           </div>
           <div>
-            <h4 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#fff' }}>{sensor.name}</h4>
-            <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{sensor.id}</p>
+            <div style={{ fontSize: '0.88rem', fontWeight: '600', color: 'var(--text-primary)', lineHeight: 1.2 }}>
+              {sensor.name}
+            </div>
+            <div style={{ fontSize: '0.65rem', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', marginTop: '2px', letterSpacing: '0.06em' }}>
+              {sensor.id} · {meta.label}
+            </div>
           </div>
         </div>
-
-        <span className={`badge ${isAlerting ? 'badge-critical' : 'badge-low'}`}>
-          {sensor.status}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+          <span className={`status-dot ${st.dot}`} />
+          <span className={st.badge}>{st.text}</span>
+        </div>
       </div>
 
+      {/* Main metric + risk */}
       <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(2, 1fr)',
-        gap: '10px',
+        display: 'grid', gridTemplateColumns: '1fr 1fr',
+        gap: '12px',
         padding: '12px',
-        background: 'rgba(0,0,0,0.2)',
-        borderRadius: '10px',
+        background: 'rgba(0,0,0,0.25)',
+        borderRadius: '6px',
+        border: '1px solid var(--border-raw)',
         marginBottom: '14px'
       }}>
         <div>
-          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Telemetry Metric</span>
-          <p style={{ fontSize: '1.05rem', fontWeight: '800', fontFamily: 'var(--font-mono)', color: '#38bdf8' }}>
-            {sensor.val || (sensor.telemetry?.waterLevel ? `${sensor.telemetry.waterLevel}m` : sensor.telemetry?.temperature ? `${sensor.telemetry.temperature}°C` : 'Nominal')}
-          </p>
+          <div className="overline" style={{ marginBottom: '4px' }}>Live Reading</div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '1.3rem', fontWeight: '700', color: meta.color, letterSpacing: '-0.01em' }}>
+            {displayVal}
+          </div>
         </div>
         <div>
-          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>AI Risk Evaluation</span>
-          <p style={{ fontSize: '1.05rem', fontWeight: '800', fontFamily: 'var(--font-mono)', color: isAlerting ? '#f43f5e' : '#34d399' }}>
-            {sensor.riskScore !== undefined ? `${(sensor.riskScore * 100).toFixed(0)}%` : '12%'}
-          </p>
+          <div className="overline" style={{ marginBottom: '4px' }}>Risk Level</div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '1.3rem', fontWeight: '700', color: riskColor, letterSpacing: '-0.01em' }}>
+            {riskPct}%
+          </div>
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Battery size={14} color="#10b981" />
-          <span>{sensor.batteryLevel || 95}%</span>
+      {/* Risk progress bar */}
+      <div style={{ marginBottom: '14px' }}>
+        <div className="prog-bar-track">
+          <div className="prog-bar-fill" style={{ width: `${riskPct}%`, background: riskColor }} />
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Radio size={14} color="#38bdf8" />
-          <span>LoRaWAN SF7</span>
+      </div>
+
+      {/* Footer: battery + signal */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-muted)', fontSize: '0.73rem' }}>
+          <Battery size={13} color="var(--moss-light)" />
+          <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
+            {sensor.batteryLevel !== undefined ? `${sensor.batteryLevel}%` : '95%'}
+          </span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <ShieldCheck size={14} color="#a855f7" />
-          <span>TFLite Int8</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-muted)', fontSize: '0.73rem' }}>
+          <Radio size={13} color="var(--river)" />
+          <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
+            {sensor.firmwareVersion || 'v2.4'}
+          </span>
+        </div>
+        <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
+          {sensor.lastPing ? new Date(sensor.lastPing).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }) : '--:--'}
         </div>
       </div>
     </div>
