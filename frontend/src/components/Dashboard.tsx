@@ -68,8 +68,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const primaryRiseRate = activeFocusSensor.riseRate;
   const primarySoilMoisture = activeFocusSensor.soilMoisture;
 
-  // 15–30 Minute Safety / Hazard Classification State:
-  // Re-evaluates only on the 15-30 minute window cadence, while raw telemetry refreshes every 3s
+  // 15–30 Minute Hydrological Cycle Timeline (simulated minutes 0m to 30m)
+  const [cycleMinute, setCycleMinute] = useState<number>(22);
+
+  // Overall Hazard Classification State (re-evaluates on 15-30m cadence or input change)
   const [evaluatedRiskTier, setEvaluatedRiskTier] = useState<FloodRiskTier>(() =>
     classifyFloodRisk(primaryWaterLevel, primaryRainfall, primaryRiseRate)
   );
@@ -78,7 +80,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     calculateRiskScore(primaryWaterLevel, primaryRainfall, primaryRiseRate, primarySoilMoisture)
   );
 
-  // Automatic state machine: computes NORMAL, WATCH, or SURGE based on live sensor values & evaluated hazard level
+  // Unified automatic state machine: computes NORMAL, WATCH, or SURGE based on reading & hazard classification
   const activeState = useMemo<'SURGE' | 'WATCH' | 'NORMAL'>(() => {
     if (evaluatedRiskTier === 'DANGER' || evaluatedRiskTier === 'WARNING') return 'SURGE';
     if (evaluatedRiskTier === 'WATCH') return 'WATCH';
@@ -125,14 +127,73 @@ export const Dashboard: React.FC<DashboardProps> = ({
     if (propAcknowledge) propAcknowledge(alertId);
   };
 
-  // Continuous 3.0s Live Telemetry Refresh: small randomized fluctuations on raw sensor values
+  // Direct Telemetry Reading Input / Test Cycle handler
+  const handleTestInput = (override?: 'NORMAL' | 'WATCH' | 'SURGE') => {
+    const nextTarget = override || (activeState === 'SURGE' ? 'WATCH' : activeState === 'WATCH' ? 'NORMAL' : 'SURGE');
+
+    let targetWater = 4.75;
+    let targetRain = 48.0;
+    let targetRise = 0.35;
+    let targetSoil = 92;
+    let targetFlow = 330;
+    let newCycle = 22;
+
+    if (nextTarget === 'WATCH') {
+      targetWater = 2.85;
+      targetRain = 18.5;
+      targetRise = 0.12;
+      targetSoil = 68;
+      targetFlow = 150;
+      newCycle = 14;
+    } else if (nextTarget === 'NORMAL') {
+      targetWater = 1.60;
+      targetRain = 6.5;
+      targetRise = 0.02;
+      targetSoil = 38;
+      targetFlow = 60;
+      newCycle = 4;
+    }
+
+    setCycleMinute(newCycle);
+
+    setSensors(prev =>
+      prev.map(s => {
+        const isTarget = s.id === (selectedSensor?.id || 'SN-FLD-01');
+        const w = isTarget ? targetWater : Math.max(0.8, parseFloat((targetWater + (Math.random() - 0.5) * 0.3).toFixed(2)));
+        const r = isTarget ? targetRain : Math.max(0, parseFloat((targetRain + (Math.random() - 0.5) * 3).toFixed(1)));
+        const tier = classifyFloodRisk(w, r, targetRise);
+        const score = calculateRiskScore(w, r, targetRise, targetSoil);
+        return {
+          ...s,
+          waterLevel: w,
+          rainfallRate: r,
+          riseRate: targetRise,
+          soilMoisture: targetSoil,
+          riverFlowRate: targetFlow,
+          riskTier: tier,
+          riskScore: score
+        };
+      })
+    );
+
+    const newTier = classifyFloodRisk(targetWater, targetRain, targetRise);
+    const newScore = calculateRiskScore(targetWater, targetRain, targetRise, targetSoil);
+    setEvaluatedRiskTier(newTier);
+    setEvaluatedRiskScore(newScore);
+    setHistoricalData(generateHistoricalData(16, targetWater, targetRain));
+  };
+
+  // Continuous 3.0s Live Telemetry Refresh: small randomized fluctuations on raw sensor values every 3s
   useEffect(() => {
     if (!isLiveStreaming) return;
 
     const interval = setInterval(() => {
-      // Small randomized fluctuation (+/- 0.02 to 0.04m, +/- 0.3 mm/h, +/- 1% runoff)
+      // Advance hydrological cycle timeline
+      setCycleMinute(prev => (prev >= 30 ? 0.5 : Number((prev + 0.25).toFixed(2))));
+
       setSensors(prev =>
         prev.map(s => {
+          // Small randomized fluctuation (+/- 0.02m, +/- 0.3 mm/h)
           const jitter = (Math.random() - 0.49) * 0.03;
           const newLevel = Math.max(0.8, parseFloat((s.waterLevel + jitter).toFixed(2)));
 
@@ -178,7 +239,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   }, [isLiveStreaming]);
 
   // Safety / Hazard Classification Refresh Cadence:
-  // Re-evaluates once every 15-30 minutes (simulated with a demo cadence timer),
+  // Re-evaluates once every 15-30 minutes (simulated with demo cadence timer),
   // using the exact internal scoring logic & thresholds
   useEffect(() => {
     if (!isLiveStreaming) return;
@@ -335,32 +396,30 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
 
-        {/* System-Detected State Machine Badges: Surge, Watch, Normal */}
+        {/* System-Detected State Machine: Surge, Watch, Normal together in one dynamic detector */}
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center bg-slate-950/90 p-1.5 rounded-xl border border-white/10 text-xs shadow-inner">
-            <span className="text-[11px] text-slate-400 uppercase px-2 font-bold flex items-center gap-1.5">
-              <Sliders size={13} className="text-cyan-400" /> SIMULATION:
+          <div
+            onClick={() => handleTestInput()}
+            title="Click to input / test reading (dynamically detects Surge, Watch, or Normal together)"
+            className="flex items-center bg-slate-950/90 p-1.5 rounded-xl border border-white/10 text-xs shadow-inner gap-2 cursor-pointer hover:border-cyan-500/40 transition-all"
+          >
+            <span className="text-[11px] text-slate-400 uppercase px-1.5 font-bold flex items-center gap-1.5">
+              <Cpu size={13} className="text-cyan-400" /> DETECTION:
             </span>
             <span
-              className={`px-3 py-1 rounded-lg transition-all font-bold ${
-                activeState === 'SURGE' ? 'bg-red-600 text-white shadow' : 'text-slate-400'
+              className={`px-3.5 py-1 rounded-lg font-black transition-all shadow flex items-center gap-2 ${
+                activeState === 'SURGE'
+                  ? 'bg-red-600 text-white shadow-lg shadow-red-950/60 ring-1 ring-red-400/50'
+                  : activeState === 'WATCH'
+                  ? 'bg-amber-600 text-white shadow-lg shadow-amber-950/60 ring-1 ring-amber-400/50'
+                  : 'bg-emerald-600 text-white shadow-lg shadow-emerald-950/60 ring-1 ring-emerald-400/50'
               }`}
             >
-              Surge
+              <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+              {activeState === 'SURGE' ? 'SURGE DETECTED' : activeState === 'WATCH' ? 'WATCH DETECTED' : 'NORMAL (SAFE)'}
             </span>
-            <span
-              className={`px-3 py-1 rounded-lg transition-all font-bold ${
-                activeState === 'WATCH' ? 'bg-amber-600 text-white shadow' : 'text-slate-400'
-              }`}
-            >
-              Watch
-            </span>
-            <span
-              className={`px-3 py-1 rounded-lg transition-all font-bold ${
-                activeState === 'NORMAL' ? 'bg-emerald-600 text-white shadow' : 'text-slate-400'
-              }`}
-            >
-              Normal
+            <span className="text-[10px] text-cyan-400 font-mono px-1.5 border-l border-white/10 hidden sm:inline">
+              15-30m Cycle: T+{Math.round(cycleMinute)}m
             </span>
           </div>
 
