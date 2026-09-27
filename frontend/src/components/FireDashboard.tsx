@@ -36,7 +36,9 @@ import {
   ShieldCheck,
   AlertTriangle,
   Radio,
-  Sparkles
+  Sparkles,
+  Compass,
+  Activity
 } from 'lucide-react';
 
 interface FireDashboardProps {
@@ -139,44 +141,40 @@ export const FireDashboard: React.FC<FireDashboardProps> = ({
   const getCycleBasinTarget = (minute: number) => {
     const norm = ((minute % 30) + 30) % 30;
     if (norm < 9) {
-      // Low / Safe Baseline
       const p = norm / 9;
       return {
-        temperature: 24.5 + p * 4.5, // 24.5°C -> 29.0°C
-        humidity: 62 - p * 15, // 62% -> 47%
-        smokePPM: 12 + p * 10, // 12 -> 22 ppm
-        carbonMonoxide: 2.5 + p * 4.0, // 2.5 -> 6.5 ppm
-        windSpeed: 10 + p * 4 // 10 -> 14 km/h
+        temperature: 24.5 + p * 4.5,
+        humidity: 62 - p * 15,
+        smokePPM: 12 + p * 10,
+        carbonMonoxide: 2.5 + p * 4.0,
+        windSpeed: 10 + p * 4
       };
     } else if (norm < 19) {
-      // Moderate Heat / Active Watch
       const p = (norm - 9) / 10;
       return {
-        temperature: 29.0 + p * 6.5, // 29.0°C -> 35.5°C
-        humidity: 47 - p * 17, // 47% -> 30%
-        smokePPM: 22 + p * 32, // 22 -> 54 ppm
-        carbonMonoxide: 6.5 + p * 7.5, // 6.5 -> 14.0 ppm
-        windSpeed: 14 + p * 6 // 14 -> 20 km/h
+        temperature: 29.0 + p * 6.5,
+        humidity: 47 - p * 17,
+        smokePPM: 22 + p * 32,
+        carbonMonoxide: 6.5 + p * 7.5,
+        windSpeed: 14 + p * 6
       };
     } else if (norm < 26) {
-      // Critical Surge / Extreme Wildfire
       const p = (norm - 19) / 7;
       return {
-        temperature: 35.5 + p * 7.5, // 35.5°C -> 43.0°C
-        humidity: 30 - p * 15, // 30% -> 15%
-        smokePPM: 54 + p * 75, // 54 -> 129 ppm
-        carbonMonoxide: 14.0 + p * 14.0, // 14.0 -> 28.0 ppm
-        windSpeed: 20 + p * 10 // 20 -> 30 km/h
+        temperature: 35.5 + p * 7.5,
+        humidity: 30 - p * 15,
+        smokePPM: 54 + p * 75,
+        carbonMonoxide: 14.0 + p * 14.0,
+        windSpeed: 20 + p * 10
       };
     } else {
-      // Evening Suppression / Rapid Cool Down
       const p = (norm - 26) / 4;
       return {
-        temperature: 43.0 - p * 18.5, // 43.0°C -> 24.5°C
-        humidity: 15 + p * 47, // 15% -> 62%
-        smokePPM: 129 - p * 117, // 129 -> 12 ppm
-        carbonMonoxide: 28.0 - p * 25.5, // 28.0 -> 2.5 ppm
-        windSpeed: 30 - p * 20 // 30 -> 10 km/h
+        temperature: 43.0 - p * 18.5,
+        humidity: 15 + p * 47,
+        smokePPM: 129 - p * 117,
+        carbonMonoxide: 28.0 - p * 25.5,
+        windSpeed: 30 - p * 20
       };
     }
   };
@@ -277,6 +275,20 @@ export const FireDashboard: React.FC<FireDashboardProps> = ({
       return true;
     });
   }, [sensors, sensorHealthFilter]);
+
+  // Tactical response label
+  const disasterResponse = useMemo(() => {
+    if (primaryRiskTier === 'EXTREME') return 'STAGE 4 EVACUATION & AIR SUPPRESSION';
+    if (primaryRiskTier === 'HIGH') return 'STAGE 3 RESPONSE SQUADS MOBILIZED';
+    if (primaryRiskTier === 'MODERATE') return 'STAGE 2 RANGER PATROLS ACCELERATED';
+    return 'STAGE 1 ROUTINE AI SURVEILLANCE';
+  }, [primaryRiskTier]);
+
+  // Subtitles for Section 1 telemetry cards
+  const tempSubtitle = primaryTemp >= 40.0 ? 'Critical Heat Threshold' : primaryTemp >= 35.0 ? 'Elevated Heat Wave' : 'Optimal Canopy Range';
+  const humidityStatus = primaryHumidity <= 20 ? 'Critical Desiccation' : primaryHumidity <= 35 ? 'Accelerated Drying' : 'Normal Moisture Level';
+  const criticalAlertsCount = alerts.filter(a => a.severity === 'CRITICAL').length;
+  const warningAlertsCount = alerts.filter(a => a.severity === 'HIGH').length;
 
   // Export SITREP JSON Report
   const handleExportData = () => {
@@ -386,7 +398,7 @@ export const FireDashboard: React.FC<FireDashboardProps> = ({
 
           <button
             onClick={handleExportData}
-            className="px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 bg-slate-900 hover:bg-slate-800 border border-white/15 text-slate-200 transition-all shadow-sm"
+            className="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-200 bg-white/5 hover:bg-white/10 border border-white/15 flex items-center gap-2 transition-all shadow-sm"
           >
             <Download size={14} />
             <span>EXPORT SITREP</span>
@@ -394,169 +406,464 @@ export const FireDashboard: React.FC<FireDashboardProps> = ({
         </div>
       </div>
 
-      {/* ========================================================
-          SECTIONS 1 & 3: FIRE RISK GAUGE + AI INFERENCE PREDICTION
-         ======================================================== */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* SECTION 1: Wildfire Risk Assessment Gauge + Real-Time Telemetry */}
-        <div className="lg:col-span-5 flex flex-col gap-6">
-          <FireGauge
-            score={primaryRiskScore}
-            tier={primaryRiskTier}
-            temperature={primaryTemp}
-            humidity={primaryHumidity}
-            smokePPM={primarySmoke}
-            windSpeed={primaryWind}
-          />
-        </div>
-
-        {/* SECTION 3: AI Inference Wildfire Spread Prediction */}
-        <div className="lg:col-span-7 flex flex-col gap-6">
-          <FirePredictionPanel prediction={prediction} />
-        </div>
-      </div>
-
-      {/* ========================================================
-          SECTIONS 4 & 5: REAL-TIME CHARTS & INTERACTIVE BANDIPUR MAP
-         ======================================================== */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* SECTION 4: Dual Environmental Trends Charts */}
-        <div className="lg:col-span-6 flex flex-col gap-4">
-          <FireCharts
-            historicalData={historicalData}
-            criticalTempThreshold={40.0}
-            warningTempThreshold={35.0}
-            criticalHumidityThreshold={25.0}
-          />
-        </div>
-
-        {/* SECTION 5: Interactive Bandipur - Western Ghats Forest Map */}
-        <div className="lg:col-span-6 flex flex-col gap-4">
-          <FireMap
-            sensors={sensors}
-            selectedSensor={selectedSensor}
-            onSelectSensor={sensor => setSelectedSensor(sensor)}
-          />
-        </div>
-      </div>
-
-      {/* ========================================================
-          SECTIONS 6 & 7: ACTIVE ALERTS & AI RECOMMENDED ACTIONS
-         ======================================================== */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* SECTION 6: Active Wildfire Alerts & Notifications */}
-        <div className="lg:col-span-6 flex flex-col gap-4">
-          <div
-            className="field-panel p-6 rounded-xl flex flex-col justify-between"
-            style={{
-              background: 'linear-gradient(160deg, rgba(15,23,42,0.95) 0%, rgba(10,15,26,0.98) 100%)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.35)'
-            }}
-          >
-            {/* Header */}
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-5 pb-4 border-b border-white/10">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-red-950/70 border border-red-500/40 flex items-center justify-center text-red-400">
-                  <BellRing size={20} className="text-red-400" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-red-400 flex items-center gap-1">
-                      <Sparkles size={12} /> SECTION 6 · EMERGENCY OPERATIONS
-                    </span>
-                  </div>
-                  <h2 className="text-xl font-bold text-white tracking-tight">
-                    Active Wildfire Alerts ({filteredAlerts.length})
-                  </h2>
-                </div>
-              </div>
-
-              {/* Severity Filter Tabs */}
-              <div className="flex items-center gap-1.5 bg-slate-900/90 p-1 rounded-lg border border-white/10 text-xs">
-                {(['ALL', 'CRITICAL', 'HIGH'] as const).map(sev => (
-                  <button
-                    key={sev}
-                    onClick={() => setAlertSeverityFilter(sev)}
-                    className={`px-3 py-1 rounded text-xs font-bold transition-all ${
-                      alertSeverityFilter === sev
-                        ? 'bg-red-500 text-white shadow-sm'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    {sev}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Alerts List */}
-            <div className="flex flex-col gap-3.5 max-h-[480px] overflow-y-auto pr-1">
-              {filteredAlerts.length === 0 ? (
-                <div className="p-8 text-center bg-slate-900/40 border border-dashed border-white/10 rounded-xl">
-                  <CheckCircle2 size={32} className="mx-auto text-emerald-400 mb-2 opacity-80" />
-                  <div className="text-sm font-bold text-slate-300">No Active Wildfire Alerts</div>
-                  <div className="text-xs text-slate-500 mt-1">All forest sectors operating below thermal alert thresholds.</div>
-                </div>
-              ) : (
-                filteredAlerts.map(alert => (
-                  <FireAlertNotification
-                    key={alert.id}
-                    alert={alert}
-                    onAcknowledge={handleAcknowledge}
-                  />
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* SECTION 7: AI Recommended Tactical Incident Actions */}
-        <div className="lg:col-span-6 flex flex-col gap-4">
-          <FireRecommendations
-            actions={recommendedActions}
-            riskTier={primaryRiskTier}
-          />
-        </div>
-      </div>
-
-      {/* ========================================================
-          SECTION 8: FOREST MULTI-SENSOR NETWORK TELEMETRY NODES
-         ======================================================== */}
-      <div
-        className="field-panel p-6 rounded-xl flex flex-col gap-5"
-        style={{
-          background: 'linear-gradient(160deg, rgba(15,23,42,0.95) 0%, rgba(10,15,26,0.98) 100%)',
-          border: '1px solid rgba(255,255,255,0.1)',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.35)'
-        }}
-      >
-        {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-white/10">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-orange-950/70 border border-orange-500/40 flex items-center justify-center text-orange-400">
-              <Radio size={20} className="text-orange-400" />
+      {/* Dynamic Alert Banner: Automatically updates to match active wildfire risk state */}
+      {primaryRiskTier === 'EXTREME' && (
+        <div className="p-4 rounded-xl border flex flex-wrap items-center justify-between gap-4 shadow-xl bg-red-500/15 border-red-500/55">
+          <div className="flex items-center gap-3.5">
+            <div className="p-2.5 rounded-lg bg-red-500/25 text-red-400 animate-bounce">
+              <ShieldAlert size={24} />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-orange-400 flex items-center gap-1">
-                  <Sparkles size={12} /> SECTION 8 · FIELD IOT SENSOR NETWORK
+                <span className="text-xs font-black uppercase text-red-400 tracking-wider">
+                  ⚠️ ACTIVE WILDFIRE BREAKOUT PROTOCOL STAGE 2
+                </span>
+                <span className="text-xs text-slate-400">· Helitack Aerial Suppression & Ground Crews Mobilized</span>
+              </div>
+              <p className="text-xs text-slate-200 mt-1">
+                Bandipur Sentinel Station recorded canopy temperature at <strong>{primaryTemp.toFixed(1)}°C</strong> with smoke concentration at <strong>{primarySmoke} ppm</strong>. Flamefront advancing towards eastern perimeter.
+              </p>
+            </div>
+          </div>
+          <span className="px-3 py-1.5 rounded-lg text-xs font-black bg-red-600 text-white animate-pulse shadow-md">
+            CRITICAL WILDFIRE CODE #991
+          </span>
+        </div>
+      )}
+
+      {primaryRiskTier === 'HIGH' && (
+        <div className="p-4 rounded-xl border flex flex-wrap items-center justify-between gap-4 shadow-xl bg-orange-500/15 border-orange-500/50">
+          <div className="flex items-center gap-3.5">
+            <div className="p-2.5 rounded-lg bg-orange-500/25 text-orange-400">
+              <AlertTriangle size={24} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black uppercase text-orange-400 tracking-wider">
+                  ⚠️ WILDFIRE HIGH RISK ADVISORY · Rapid Thermal Escalation Detected
+                </span>
+                <span className="text-xs text-slate-400">· Emergency Response Squads On Standby</span>
+              </div>
+              <p className="text-xs text-slate-200 mt-1">
+                Canopy temperature elevated to <strong>{primaryTemp.toFixed(1)}°C</strong> with desiccated humidity at <strong>{primaryHumidity}%</strong>. Quick-response wildfire strike squads placed on 10-minute standby.
+              </p>
+            </div>
+          </div>
+          <span className="px-3 py-1.5 rounded-lg text-xs font-black bg-orange-600 text-white shadow-md">
+            ORANGE ALERT CODE #620
+          </span>
+        </div>
+      )}
+
+      {primaryRiskTier === 'MODERATE' && (
+        <div className="p-4 rounded-xl border flex flex-wrap items-center justify-between gap-4 shadow-xl bg-amber-500/10 border-amber-500/40">
+          <div className="flex items-center gap-3.5">
+            <div className="p-2.5 rounded-lg bg-amber-500/20 text-amber-400">
+              <Info size={24} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black uppercase text-amber-400 tracking-wider">
+                  ℹ️ WILDFIRE WEATHER WATCH NOTICE · Elevated Dryness & Heat Advisory
+                </span>
+                <span className="text-xs text-slate-400">· Monitoring Polling Accelerated</span>
+              </div>
+              <p className="text-xs text-slate-200 mt-1">
+                Daytime heat index at <strong>{primaryTemp.toFixed(1)}°C</strong> and relative humidity declining to <strong>{primaryHumidity}%</strong>. Forest patrol frequency doubled across high fuel-accumulation sectors.
+              </p>
+            </div>
+          </div>
+          <span className="px-3 py-1.5 rounded-lg text-xs font-black bg-amber-600 text-white shadow-md">
+            YELLOW WATCH CODE #340
+          </span>
+        </div>
+      )}
+
+      {primaryRiskTier === 'LOW' && (
+        <div className="p-4 rounded-xl border flex flex-wrap items-center justify-between gap-4 shadow-xl bg-emerald-500/10 border-emerald-500/35">
+          <div className="flex items-center gap-3.5">
+            <div className="p-2.5 rounded-lg bg-emerald-500/20 text-emerald-400">
+              <ShieldCheck size={24} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black uppercase text-emerald-400 tracking-wider">
+                  ✓ ALL FOREST SECTORS NOMINAL · Continuous AI Wildfire Surveillance Active
+                </span>
+                <span className="text-xs text-slate-400">· Optimal Microclimate Baseline</span>
+              </div>
+              <p className="text-xs text-slate-200 mt-1">
+                Ambient canopy temperature <strong>{primaryTemp.toFixed(1)}°C</strong> and relative humidity <strong>{primaryHumidity}%</strong> remain within safe seasonal limits.
+              </p>
+            </div>
+          </div>
+          <span className="px-3 py-1.5 rounded-lg text-xs font-black bg-emerald-600 text-white shadow-md">
+            ALL NOMINAL CODE #100
+          </span>
+        </div>
+      )}
+
+      {/* ========================================================
+          SECTION 1: TOP SUMMARY CARDS (4 CARDS GRID)
+          1. Current Temperature
+          2. Current Humidity
+          3. Current Fire Risk Level
+          4. Number of Active Alerts
+         ======================================================== */}
+      <div>
+        <div className="text-[11px] font-bold uppercase tracking-wider text-orange-400 mb-3 px-1">
+          SECTION 1 · REAL-TIME TELEMETRIC SUMMARY
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Card 1: Current Temperature */}
+          <div
+            className="field-panel p-5 rounded-xl relative overflow-hidden flex flex-col justify-between"
+            style={{
+              background: 'linear-gradient(150deg, rgba(15,23,42,0.95) 0%, rgba(10,15,26,0.98) 100%)',
+              border: '1px solid rgba(249,115,22,0.3)',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.35)'
+            }}
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <span className="text-[11px] uppercase font-bold text-orange-400 tracking-wider">
+                  Thermal Canopy Sensor
+                </span>
+                <div className="text-base font-bold text-white mt-0.5">Canopy Temperature</div>
+              </div>
+              <div className="w-10 h-10 rounded-lg bg-orange-500/10 border border-orange-500/30 flex items-center justify-center text-orange-400">
+                <Thermometer size={20} />
+              </div>
+            </div>
+
+            <div className="my-3">
+              <div className="flex items-baseline gap-2">
+                <span className="text-4xl font-black text-orange-300 font-mono tracking-tight">
+                  {primaryTemp.toFixed(1)}
+                </span>
+                <span className="text-sm font-semibold text-slate-400">°C</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs font-semibold text-orange-400 mt-1">
+                <span>▲ Max Today: {activeFocusSensor.maxTempToday.toFixed(1)}°C</span>
+                <span className="text-slate-500">· {tempSubtitle}</span>
+              </div>
+            </div>
+
+            <div className="text-xs text-slate-400 pt-2.5 border-t border-white/5 flex justify-between">
+              <span>Critical Heat Limit:</span>
+              <strong className="text-red-400 font-mono">40.0°C</strong>
+            </div>
+          </div>
+
+          {/* Card 2: Current Relative Humidity */}
+          <div
+            className="field-panel p-5 rounded-xl relative overflow-hidden flex flex-col justify-between"
+            style={{
+              background: 'linear-gradient(150deg, rgba(15,23,42,0.95) 0%, rgba(10,15,26,0.98) 100%)',
+              border: '1px solid rgba(56,189,248,0.3)',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.35)'
+            }}
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <span className="text-[11px] uppercase font-bold text-cyan-400 tracking-wider">
+                  Atmospheric Moisture
+                </span>
+                <div className="text-base font-bold text-white mt-0.5">Relative Humidity</div>
+              </div>
+              <div className="w-10 h-10 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                <Droplets size={20} />
+              </div>
+            </div>
+
+            <div className="my-3">
+              <div className="flex items-baseline gap-2">
+                <span className="text-4xl font-black text-cyan-300 font-mono tracking-tight">
+                  {primaryHumidity}
+                </span>
+                <span className="text-sm font-semibold text-slate-400">% RH</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs font-semibold text-cyan-400 mt-1">
+                <span>{humidityStatus}</span>
+                <span className="text-slate-500">· Smoke: {primarySmoke} ppm</span>
+              </div>
+            </div>
+
+            <div className="text-xs text-slate-400 pt-2.5 border-t border-white/5 flex justify-between">
+              <span>Desiccation Danger:</span>
+              <strong className="text-amber-400 font-mono">&lt; 25% RH</strong>
+            </div>
+          </div>
+
+          {/* Card 3: Current Fire Risk Level */}
+          <div
+            className="field-panel p-5 rounded-xl relative overflow-hidden flex flex-col justify-between"
+            style={{
+              background: `linear-gradient(150deg, ${riskMeta.bg} 0%, rgba(10,15,26,0.98) 100%)`,
+              border: `1px solid ${riskMeta.border}`,
+              boxShadow: riskMeta.glow
+            }}
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <span className="text-[11px] uppercase font-bold text-slate-400 tracking-wider">
+                  Hazard Classification
+                </span>
+                <div className="text-base font-bold text-white mt-0.5">Current Fire Risk Level</div>
+              </div>
+              <div
+                className="w-10 h-10 rounded-lg flex items-center justify-center shadow-sm"
+                style={{ background: riskMeta.bg, border: `1px solid ${riskMeta.border}` }}
+              >
+                <Flame size={20} color={riskMeta.color} />
+              </div>
+            </div>
+
+            <div className="my-3">
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-black uppercase tracking-tight" style={{ color: riskMeta.text }}>
+                  {primaryRiskTier}
+                </span>
+                <span className="text-sm font-bold text-slate-400 font-mono">
+                  ({primaryRiskScore}/100)
                 </span>
               </div>
+              <div className="text-xs text-slate-300 mt-1 font-medium">
+                {primaryRiskTier === 'EXTREME'
+                  ? 'Active Crown Combustion Imminent'
+                  : primaryRiskTier === 'HIGH'
+                  ? 'Rapid Wind-Driven Surface Spread'
+                  : primaryRiskTier === 'MODERATE'
+                  ? 'Thermal Spotting & Smolder Watch'
+                  : 'Nominal Forest Baseline'}
+              </div>
+            </div>
+
+            <div className="text-xs text-slate-400 pt-2.5 border-t border-white/5 flex justify-between">
+              <span>Disaster Response:</span>
+              <strong style={{ color: riskMeta.text }} className="font-semibold">{disasterResponse}</strong>
+            </div>
+          </div>
+
+          {/* Card 4: Number of Active Alerts */}
+          <div
+            className="field-panel p-5 rounded-xl relative overflow-hidden flex flex-col justify-between"
+            style={{
+              background: 'linear-gradient(150deg, rgba(30,15,15,0.95) 0%, rgba(15,10,10,0.98) 100%)',
+              border: alerts.length > 0 ? '1px solid rgba(239,68,68,0.4)' : '1px solid rgba(255,255,255,0.1)',
+              boxShadow: alerts.length > 0 ? '0 8px 24px rgba(239,68,68,0.15)' : 'none'
+            }}
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <span className="text-[11px] uppercase font-bold text-red-400 tracking-wider">
+                  Emergency Dispatch
+                </span>
+                <div className="text-base font-bold text-white mt-0.5">Number of Active Alerts</div>
+              </div>
+              <div className="w-10 h-10 rounded-lg bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-400">
+                <BellRing size={20} className={alerts.length > 0 ? 'animate-bounce' : ''} />
+              </div>
+            </div>
+
+            <div className="my-3">
+              <div className="flex items-baseline gap-2">
+                <span className="text-4xl font-black text-red-400 font-mono tracking-tight">
+                  {alerts.length}
+                </span>
+                <span className="text-sm font-semibold text-slate-400">Active Incidents</span>
+              </div>
+              <div className="text-xs text-red-300 mt-1">
+                <strong>{criticalAlertsCount} Critical Hazards</strong> · {warningAlertsCount} Warning
+              </div>
+            </div>
+
+            <div className="text-xs text-slate-400 pt-2.5 border-t border-white/5 flex justify-between">
+              <span>Avg Emergency Response:</span>
+              <strong className="text-emerald-400 font-semibold">&lt; 5 minutes</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================================
+          SECTION 2: FIRE RISK INDICATOR (LARGE VISUAL GAUGE - FULL WIDTH)
+         ======================================================== */}
+      <div>
+        <FireGauge
+          score={primaryRiskScore}
+          tier={primaryRiskTier}
+          temperature={primaryTemp}
+          humidity={primaryHumidity}
+          smokePPM={primarySmoke}
+          windSpeed={primaryWind}
+        />
+      </div>
+
+      {/* ========================================================
+          SECTION 3: AI FOREST FIRE SPREAD PREDICTION PANEL (FULL WIDTH)
+         ======================================================== */}
+      <div>
+        <FirePredictionPanel prediction={prediction} />
+      </div>
+
+      {/* ========================================================
+          SECTIONS 4 & 5: TEMPERATURE & HUMIDITY/WIND TREND CHARTS (FULL WIDTH)
+         ======================================================== */}
+      <div>
+        <FireCharts
+          historicalData={historicalData}
+          criticalTempThreshold={40.0}
+          warningTempThreshold={35.0}
+          criticalHumidityThreshold={25.0}
+        />
+      </div>
+
+      {/* ========================================================
+          SECTION 6: INTERACTIVE FOREST FIRE RISK MAP (FULL WIDTH)
+         ======================================================== */}
+      <div>
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-3 px-1">
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-orange-400 flex items-center gap-1.5">
+              <Layers size={14} /> SECTION 6 · GEOSPATIAL WILDFIRE SENSOR NETWORK
+            </div>
+            <h2 className="text-xl font-bold text-white tracking-tight">
+              Interactive Forest Fire Spread Map
+            </h2>
+          </div>
+          <span className="text-xs text-slate-300 font-medium">
+            Displaying all {sensors.length} sentinel stations, active fire perimeter & nearby villages across Bandipur Reserve
+          </span>
+        </div>
+
+        <FireMap
+          sensors={sensors}
+          selectedSensor={selectedSensor}
+          onSelectSensor={setSelectedSensor}
+        />
+      </div>
+
+      {/* ========================================================
+          SECTION 7: ACTIVE WILDFIRE ALERTS SECTION (FULL WIDTH)
+         ======================================================== */}
+      <div
+        className="field-panel p-6 rounded-xl flex flex-col justify-between"
+        style={{
+          background: 'linear-gradient(160deg, rgba(15,23,42,0.95) 0%, rgba(10,15,26,0.98) 100%)',
+          border: '1px solid rgba(239,68,68,0.3)',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.35)'
+        }}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-5 pb-3 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-red-950/60 border border-red-500/40 flex items-center justify-center text-red-400">
+              <ShieldAlert size={22} />
+            </div>
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-wider text-red-400">
+                SECTION 7 · EMERGENCY TELEMETRY DISPATCH FEED
+              </div>
               <h2 className="text-xl font-bold text-white tracking-tight">
-                Bandipur Reserve Sentinel Stations ({filteredSensors.length} Nodes Active)
+                Active Hazard Alerts ({alerts.length})
               </h2>
             </div>
           </div>
 
-          {/* Node Health Filters */}
+          {/* Filter buttons */}
+          <div className="flex items-center gap-1.5 bg-slate-900/90 p-1 rounded-xl border border-white/10 text-xs">
+            <span className="text-slate-400 px-2 font-semibold flex items-center gap-1">
+              <Filter size={12} /> Severity:
+            </span>
+            <button
+              onClick={() => setAlertSeverityFilter('ALL')}
+              className={`px-3 py-1 rounded-lg transition-all font-bold ${
+                alertSeverityFilter === 'ALL' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              All Alerts ({alerts.length})
+            </button>
+            <button
+              onClick={() => setAlertSeverityFilter('CRITICAL')}
+              className={`px-3 py-1 rounded-lg transition-all font-bold ${
+                alertSeverityFilter === 'CRITICAL' ? 'bg-red-600 text-white' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Critical ({alerts.filter(a => a.severity === 'CRITICAL').length})
+            </button>
+            <button
+              onClick={() => setAlertSeverityFilter('HIGH')}
+              className={`px-3 py-1 rounded-lg transition-all font-bold ${
+                alertSeverityFilter === 'HIGH' ? 'bg-orange-600 text-white' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Warning ({alerts.filter(a => a.severity === 'HIGH').length})
+            </button>
+          </div>
+        </div>
+
+        {/* List of alert cards */}
+        <div className="flex flex-col gap-3.5">
+          {filteredAlerts.length === 0 ? (
+            <div className="p-8 rounded-xl bg-slate-900/50 border border-white/5 text-center text-slate-400 text-sm">
+              <CheckCircle2 size={28} className="text-emerald-400 mx-auto mb-2" />
+              No active alerts matching filter. All monitored forest sectors nominal.
+            </div>
+          ) : (
+            filteredAlerts.map(alert => (
+              <FireAlertNotification
+                key={alert.id}
+                alert={alert}
+                onAcknowledge={handleAcknowledge}
+              />
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* ========================================================
+          SECTION 8: AI RECOMMENDED ACTIONS (FULL WIDTH)
+         ======================================================== */}
+      <div>
+        <FireRecommendations
+          actions={recommendedActions}
+          riskTier={primaryRiskTier}
+        />
+      </div>
+
+      {/* ========================================================
+          SECTION 9: FOREST SENTINEL SENSOR NETWORK (FULL WIDTH)
+         ======================================================== */}
+      <div
+        className="field-panel p-6 rounded-xl flex flex-col justify-between"
+        style={{
+          background: 'linear-gradient(160deg, rgba(15,23,42,0.95) 0%, rgba(10,15,26,0.98) 100%)',
+          border: '1px solid rgba(249,115,22,0.25)',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.35)'
+        }}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-5 pb-3 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-orange-950/60 border border-orange-500/40 flex items-center justify-center text-orange-400">
+              <Cpu size={22} />
+            </div>
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-wider text-orange-400">
+                SECTION 9 · FIELD IOT SENSOR NETWORK
+              </div>
+              <h2 className="text-xl font-bold text-white tracking-tight">
+                Bandipur Reserve Sentinel Stations ({sensors.length} Stations Active)
+              </h2>
+            </div>
+          </div>
+
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 bg-slate-900/90 p-1 rounded-lg border border-white/10 text-xs">
+            <div className="flex items-center gap-1.5 bg-slate-900/90 p-1 rounded-xl border border-white/10 text-xs">
               {(['ALL', 'ONLINE', 'ALERTING'] as const).map(f => (
                 <button
                   key={f}
                   onClick={() => setSensorHealthFilter(f)}
-                  className={`px-3 py-1 rounded text-xs font-bold transition-all ${
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
                     sensorHealthFilter === f
                       ? 'bg-orange-500 text-white shadow-sm'
                       : 'text-slate-400 hover:text-slate-200'

@@ -3,8 +3,8 @@ import { LayoutDashboard, Cpu, AlertTriangle, BarChart3, Home, User, LogIn, Leaf
 
 const navItems = [
   { id: 'home',      icon: Home,            label: 'Overview' },
-  { id: 'dashboard', icon: Waves,           label: 'Flood Monitoring Dashboard' },
-  { id: 'fire',      icon: Flame,           label: 'Forest Fire Monitoring Dashboard' },
+  { id: 'flood',     icon: Waves,           label: 'Flood Detection Monitoring' },
+  { id: 'fire',      icon: Flame,           label: 'Forest Fire Detection Monitoring' },
   { id: 'sensors',   icon: Cpu,             label: 'Field Nodes' },
   { id: 'alerts',    icon: AlertTriangle,   label: 'Active Alerts' },
   { id: 'analytics', icon: BarChart3,       label: 'Trend Analysis' },
@@ -28,7 +28,22 @@ export const Sidebar = ({ activePage, setActivePage }) => {
     }}>
       {navItems.map(item => {
         const Icon = item.icon;
-        const isActive = activePage === item.id;
+        const isActive = item.id === 'flood'
+          ? (activePage === 'flood' || activePage === 'dashboard')
+          : activePage === item.id;
+
+        const activeColor = item.id === 'fire' ? '#fb923c' : item.id === 'flood' ? '#38bdf8' : '#82b460';
+        const activeBg = item.id === 'fire'
+          ? 'rgba(249,115,22,0.18)'
+          : item.id === 'flood'
+          ? 'rgba(56,189,248,0.18)'
+          : 'rgba(90,138,74,0.15)';
+        const activeBorder = item.id === 'fire'
+          ? '1px solid rgba(249,115,22,0.45)'
+          : item.id === 'flood'
+          ? '1px solid rgba(56,189,248,0.45)'
+          : '1px solid rgba(90,138,74,0.35)';
+
         return (
           <button
             key={item.id}
@@ -38,9 +53,9 @@ export const Sidebar = ({ activePage, setActivePage }) => {
               width: '44px', height: '44px',
               borderRadius: '8px',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: isActive ? '#82b460' : 'var(--stone)',
-              background: isActive ? 'rgba(90,138,74,0.15)' : 'transparent',
-              border: isActive ? '1px solid rgba(90,138,74,0.35)' : '1px solid transparent',
+              color: isActive ? activeColor : 'var(--stone)',
+              background: isActive ? activeBg : 'transparent',
+              border: isActive ? activeBorder : '1px solid transparent',
               transition: 'all 0.2s ease',
               position: 'relative',
             }}
@@ -52,7 +67,7 @@ export const Sidebar = ({ activePage, setActivePage }) => {
                 position: 'absolute',
                 left: 0, top: '25%',
                 width: '3px', height: '50%',
-                background: 'var(--moss-light)',
+                background: activeColor,
                 borderRadius: '0 3px 3px 0',
               }} />
             )}

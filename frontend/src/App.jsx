@@ -35,7 +35,7 @@ const AppLoader = () => (
 );
 
 export function App() {
-  const [activePage, setActivePage] = useState('dashboard');
+  const [activePage, setActivePage] = useState('flood');
   const { sensors }                 = useSensorData();
   const { alerts, acknowledgeAlert} = useAlerts();
   const { user, loading, register, login, loginWithGoogle, logout } = useAuth();
