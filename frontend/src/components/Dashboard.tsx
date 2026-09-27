@@ -69,26 +69,24 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const primarySoilMoisture = activeFocusSensor.soilMoisture;
 
   // 15–30 Minute Hydrological Cycle Timeline (simulated minutes 0m to 30m)
-  const [cycleMinute, setCycleMinute] = useState<number>(22);
+  const [cycleMinute, setCycleMinute] = useState<number>(14);
 
-  // Overall Hazard Classification State (re-evaluates on 15-30m cadence or input change)
-  const [evaluatedRiskTier, setEvaluatedRiskTier] = useState<FloodRiskTier>(() =>
-    classifyFloodRisk(primaryWaterLevel, primaryRainfall, primaryRiseRate)
-  );
+  // Overall Hazard Classification & Risk Scoring:
+  // Dynamically and continuously computed DIRECTLY from the live telemetry readings
+  const primaryRiskTier = useMemo<FloodRiskTier>(() => {
+    return classifyFloodRisk(primaryWaterLevel, primaryRainfall, primaryRiseRate);
+  }, [primaryWaterLevel, primaryRainfall, primaryRiseRate]);
 
-  const [evaluatedRiskScore, setEvaluatedRiskScore] = useState<number>(() =>
-    calculateRiskScore(primaryWaterLevel, primaryRainfall, primaryRiseRate, primarySoilMoisture)
-  );
+  const primaryRiskScore = useMemo<number>(() => {
+    return calculateRiskScore(primaryWaterLevel, primaryRainfall, primaryRiseRate, primarySoilMoisture);
+  }, [primaryWaterLevel, primaryRainfall, primaryRiseRate, primarySoilMoisture]);
 
-  // Unified automatic state machine: computes NORMAL, WATCH, or SURGE based on reading & hazard classification
+  // Unified automatic state machine: computes NORMAL, WATCH, or SURGE directly from the reading's risk tier
   const activeState = useMemo<'SURGE' | 'WATCH' | 'NORMAL'>(() => {
-    if (evaluatedRiskTier === 'DANGER' || evaluatedRiskTier === 'WARNING') return 'SURGE';
-    if (evaluatedRiskTier === 'WATCH') return 'WATCH';
+    if (primaryRiskTier === 'DANGER' || primaryRiskTier === 'WARNING') return 'SURGE';
+    if (primaryRiskTier === 'WATCH') return 'WATCH';
     return 'NORMAL';
-  }, [evaluatedRiskTier]);
-
-  const primaryRiskTier = evaluatedRiskTier;
-  const primaryRiskScore = evaluatedRiskScore;
+  }, [primaryRiskTier]);
 
   const riskMeta = RISK_COLORS[primaryRiskTier] || RISK_COLORS.SAFE;
 
@@ -127,91 +125,109 @@ export const Dashboard: React.FC<DashboardProps> = ({
     if (propAcknowledge) propAcknowledge(alertId);
   };
 
-  // Direct Telemetry Reading Input / Test Cycle handler
-  const handleTestInput = (override?: 'NORMAL' | 'WATCH' | 'SURGE') => {
-    const nextTarget = override || (activeState === 'SURGE' ? 'WATCH' : activeState === 'WATCH' ? 'NORMAL' : 'SURGE');
-
-    let targetWater = 4.75;
-    let targetRain = 48.0;
-    let targetRise = 0.35;
-    let targetSoil = 92;
-    let targetFlow = 330;
-    let newCycle = 22;
-
-    if (nextTarget === 'WATCH') {
-      targetWater = 2.85;
-      targetRain = 18.5;
-      targetRise = 0.12;
-      targetSoil = 68;
-      targetFlow = 150;
-      newCycle = 14;
-    } else if (nextTarget === 'NORMAL') {
-      targetWater = 1.60;
-      targetRain = 6.5;
-      targetRise = 0.02;
-      targetSoil = 38;
-      targetFlow = 60;
-      newCycle = 4;
+  /**
+   * 15–30 Minute Hydrological Basin Hydrograph Model:
+   * Computes realistic river stage elevation and rainfall accumulation over a 30-minute cycle.
+   * - Minutes 0m - 9m: Baseline / Routine stage (Normal < 2.0m water, < 10 mm/h rain) -> NORMAL
+   * - Minutes 9m - 19m: Catchment Inflow stage (Watch 2.0m - 3.5m water, 10 - 25 mm/h rain) -> WATCH
+   * - Minutes 19m - 26m: Peak Storm Crest stage (Surge > 4.2m water, > 40 mm/h rain) -> SURGE
+   * - Minutes 26m - 30m: Spillway Drainage / Recession stage (waters return to baseline) -> NORMAL
+   */
+  const getCycleBasinTarget = (minute: number) => {
+    const norm = ((minute % 30) + 30) % 30;
+    if (norm < 9) {
+      // Normal / Safe Baseline
+      const p = norm / 9;
+      return {
+        waterLevel: 1.45 + p * 0.45,
+        rainfallRate: 4.5 + p * 4.5,
+        riseRate: 0.02 + p * 0.03,
+        soilMoisture: Math.round(36 + p * 10),
+        riverFlowRate: Math.round(60 + p * 30),
+      };
+    } else if (norm < 19) {
+      // Heightened Catchment Inflow / Watch Notice (e.g. at minute 14: waterLevel ~ 2.85m, rainfall ~ 18.5 mm/h)
+      const p = (norm - 9) / 10;
+      return {
+        waterLevel: 2.15 + p * 1.15,
+        rainfallRate: 12.0 + p * 10.5,
+        riseRate: 0.10 + p * 0.08,
+        soilMoisture: Math.round(55 + p * 18),
+        riverFlowRate: Math.round(115 + p * 90),
+      };
+    } else if (norm < 26) {
+      // Storm Crest / Inundation Surge (> 4.2m water, > 40 mm/h rain)
+      const p = (norm - 19) / 7;
+      return {
+        waterLevel: 4.28 + p * 0.50,
+        rainfallRate: 41.5 + p * 9.0,
+        riseRate: 0.32 + p * 0.08,
+        soilMoisture: Math.round(87 + p * 8),
+        riverFlowRate: Math.round(290 + p * 65),
+      };
+    } else {
+      // Recession Limb / Drainage back to baseline
+      const p = (norm - 26) / 4;
+      return {
+        waterLevel: 4.20 - p * 2.65,
+        rainfallRate: 36.0 - p * 30.5,
+        riseRate: 0.04,
+        soilMoisture: Math.round(82 - p * 44),
+        riverFlowRate: Math.round(260 - p * 195),
+      };
     }
-
-    setCycleMinute(newCycle);
-
-    setSensors(prev =>
-      prev.map(s => {
-        const isTarget = s.id === (selectedSensor?.id || 'SN-FLD-01');
-        const w = isTarget ? targetWater : Math.max(0.8, parseFloat((targetWater + (Math.random() - 0.5) * 0.3).toFixed(2)));
-        const r = isTarget ? targetRain : Math.max(0, parseFloat((targetRain + (Math.random() - 0.5) * 3).toFixed(1)));
-        const tier = classifyFloodRisk(w, r, targetRise);
-        const score = calculateRiskScore(w, r, targetRise, targetSoil);
-        return {
-          ...s,
-          waterLevel: w,
-          rainfallRate: r,
-          riseRate: targetRise,
-          soilMoisture: targetSoil,
-          riverFlowRate: targetFlow,
-          riskTier: tier,
-          riskScore: score
-        };
-      })
-    );
-
-    const newTier = classifyFloodRisk(targetWater, targetRain, targetRise);
-    const newScore = calculateRiskScore(targetWater, targetRain, targetRise, targetSoil);
-    setEvaluatedRiskTier(newTier);
-    setEvaluatedRiskScore(newScore);
-    setHistoricalData(generateHistoricalData(16, targetWater, targetRain));
   };
 
-  // Continuous 3.0s Live Telemetry Refresh: small randomized fluctuations on raw sensor values every 3s
+  // Continuous 3.0s Live Telemetry Refresh:
+  // Automatically updates sensor readings every 3s with natural fluctuations, progressing along the 15-30m cycle.
+  // Hazard classification and detection badge are 100% reading-driven (not manual).
   useEffect(() => {
     if (!isLiveStreaming) return;
 
     const interval = setInterval(() => {
       // Advance hydrological cycle timeline
-      setCycleMinute(prev => (prev >= 30 ? 0.5 : Number((prev + 0.25).toFixed(2))));
+      let nextMin = 14;
+      setCycleMinute(prev => {
+        nextMin = prev >= 30 ? 0.5 : Number((prev + 0.3).toFixed(2));
+        return nextMin;
+      });
+
+      const basinTarget = getCycleBasinTarget(nextMin);
 
       setSensors(prev =>
         prev.map(s => {
-          // Small randomized fluctuation (+/- 0.02m, +/- 0.3 mm/h)
-          const jitter = (Math.random() - 0.49) * 0.03;
-          const newLevel = Math.max(0.8, parseFloat((s.waterLevel + jitter).toFixed(2)));
+          const isNodeAlpha = s.id === 'SN-FLD-01';
+          const offsetW = isNodeAlpha ? 0 : s.id === 'SN-FLD-04' ? -0.8 : s.id === 'SN-FLD-02' ? 0.3 : (Math.sin(s.latitude) * 0.35);
+          const offsetR = isNodeAlpha ? 0 : s.id === 'SN-FLD-04' ? -5 : s.id === 'SN-FLD-02' ? 5 : (Math.cos(s.longitude) * 4);
 
+          const targetWater = Math.max(0.8, basinTarget.waterLevel + offsetW);
+          const targetRain = Math.max(0, basinTarget.rainfallRate + offsetR);
+
+          // Small natural live fluctuation (+/- 0.02m, +/- 0.3 mm/h)
+          const waterJitter = (Math.random() - 0.49) * 0.03;
           const rainJitter = (Math.random() - 0.5) * 0.4;
-          const newRain = Math.max(0, parseFloat((s.rainfallRate + rainJitter).toFixed(1)));
-
           const soilJitter = Math.round((Math.random() - 0.5) * 1.5);
-          const newSoil = Math.min(99, Math.max(15, s.soilMoisture + soilJitter));
-
           const flowJitter = Math.round((Math.random() - 0.5) * 3);
-          const newFlow = Math.max(20, s.riverFlowRate + flowJitter);
+
+          // Smooth convergence to basin target
+          const newLevel = Math.max(0.8, parseFloat((s.waterLevel * 0.90 + targetWater * 0.10 + waterJitter).toFixed(2)));
+          const newRain = Math.max(0, parseFloat((s.rainfallRate * 0.90 + targetRain * 0.10 + rainJitter).toFixed(1)));
+          const newRise = parseFloat((basinTarget.riseRate + (Math.random() - 0.5) * 0.02).toFixed(2));
+          const newSoil = Math.min(99, Math.max(15, Math.round(basinTarget.soilMoisture + soilJitter)));
+          const newFlow = Math.max(20, Math.round(basinTarget.riverFlowRate + flowJitter));
+
+          const tier = classifyFloodRisk(newLevel, newRain, newRise);
+          const score = calculateRiskScore(newLevel, newRain, newRise, newSoil);
 
           return {
             ...s,
             waterLevel: newLevel,
             rainfallRate: newRain,
+            riseRate: newRise,
             soilMoisture: newSoil,
             riverFlowRate: newFlow,
+            riskTier: tier,
+            riskScore: score,
             lastPing: new Date().toISOString()
           };
         })
@@ -222,8 +238,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
         const now = new Date();
         const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         const last = prev[prev.length - 1];
-        const newWater = parseFloat((last.waterLevel + (Math.random() - 0.49) * 0.03).toFixed(2));
-        const newRain = Math.max(0, parseFloat((last.rainfall + (Math.random() - 0.5) * 0.4).toFixed(1)));
+        const newWater = parseFloat((last.waterLevel * 0.90 + basinTarget.waterLevel * 0.10 + (Math.random() - 0.49) * 0.03).toFixed(2));
+        const newRain = Math.max(0, parseFloat((last.rainfall * 0.90 + basinTarget.rainfallRate * 0.10 + (Math.random() - 0.5) * 0.4).toFixed(1)));
         const newScore = calculateRiskScore(newWater, newRain);
 
         return [...prev.slice(1), {
@@ -237,47 +253,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
     return () => clearInterval(interval);
   }, [isLiveStreaming]);
-
-  // Safety / Hazard Classification Refresh Cadence:
-  // Re-evaluates once every 15-30 minutes (simulated with demo cadence timer),
-  // using the exact internal scoring logic & thresholds
-  useEffect(() => {
-    if (!isLiveStreaming) return;
-
-    // Simulated 15-30 min evaluation cadence interval (20s demo cadence simulates a 20-minute hydrological epoch)
-    const CADENCE_INTERVAL_MS = 20000;
-
-    const cadenceTimer = setInterval(() => {
-      setSensors(currentSensors => {
-        const targetSensor = selectedSensor
-          ? currentSensors.find(s => s.id === selectedSensor.id) || currentSensors[0]
-          : currentSensors[0];
-
-        const recalculatedTier = classifyFloodRisk(
-          targetSensor.waterLevel,
-          targetSensor.rainfallRate,
-          targetSensor.riseRate
-        );
-        const recalculatedScore = calculateRiskScore(
-          targetSensor.waterLevel,
-          targetSensor.rainfallRate,
-          targetSensor.riseRate,
-          targetSensor.soilMoisture
-        );
-
-        setEvaluatedRiskTier(recalculatedTier);
-        setEvaluatedRiskScore(recalculatedScore);
-
-        return currentSensors.map(s => ({
-          ...s,
-          riskTier: classifyFloodRisk(s.waterLevel, s.rainfallRate, s.riseRate),
-          riskScore: calculateRiskScore(s.waterLevel, s.rainfallRate, s.riseRate, s.soilMoisture)
-        }));
-      });
-    }, CADENCE_INTERVAL_MS);
-
-    return () => clearInterval(cadenceTimer);
-  }, [isLiveStreaming, selectedSensor]);
 
   // Dynamic text generators for Top Summary Cards
   const getRainfallSubtitle = (rain: number) => {
@@ -399,9 +374,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {/* System-Detected State Machine: Surge, Watch, Normal together in one dynamic detector */}
         <div className="flex flex-wrap items-center gap-3">
           <div
-            onClick={() => handleTestInput()}
-            title="Click to input / test reading (dynamically detects Surge, Watch, or Normal together)"
-            className="flex items-center bg-slate-950/90 p-1.5 rounded-xl border border-white/10 text-xs shadow-inner gap-2 cursor-pointer hover:border-cyan-500/40 transition-all"
+            title="Real-time detection: automatically updates between NORMAL, WATCH, and SURGE based on live telemetry readings"
+            className="flex items-center bg-slate-950/90 p-1.5 rounded-xl border border-white/10 text-xs shadow-inner gap-2 select-none"
           >
             <span className="text-[11px] text-slate-400 uppercase px-1.5 font-bold flex items-center gap-1.5">
               <Cpu size={13} className="text-cyan-400" /> DETECTION:
