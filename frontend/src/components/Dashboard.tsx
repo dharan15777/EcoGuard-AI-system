@@ -1,16 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { FireSensor, FireAlert, HistoricalFireReading, FireRiskTier } from '../types/fire';
+import { FloodSensor, FloodAlert, HistoricalReading } from '../types/flood';
 import {
-  INITIAL_FIRE_SENSORS,
-  FIRE_RISK_COLORS,
-  classifyFireRisk,
-  calculateFireRiskScore,
-  getAIFirePrediction,
-  getAIFireRecommendations,
-  generateDynamicFireAlerts,
-  generateHistoricalFireData
-} from '../utils/fireConstants';
-import { FireGauge } from './FloodGauge';
+  INITIAL_FLOOD_SENSORS,
+  generateHistoricalData,
+  getAIPrediction,
+  getAIRecommendedActions,
+  generateDynamicAlerts,
+  classifyFloodRisk,
+  calculateRiskScore,
+  RISK_COLORS
+} from '../utils/floodConstants';
+import { FloodGauge } from './FloodGauge';
 import { AIPredictionPanel } from './AIPredictionPanel';
 import { AIRecommendedActions } from './AIRecommendedActions';
 import { Charts } from './Charts';
@@ -18,26 +18,21 @@ import { Map } from './Map';
 import { AlertNotification } from './AlertNotification';
 import { SensorCard } from './SensorCard';
 import {
-  Flame,
-  Thermometer,
-  CloudFog,
-  Wind,
-  Droplets,
+  Waves,
+  CloudRain,
   ShieldAlert,
   BellRing,
   Play,
   Pause,
   Download,
+  Sliders,
   Filter,
   CheckCircle2,
   Cpu,
   Layers,
   Info,
   ShieldCheck,
-  AlertTriangle,
-  Home,
-  Compass,
-  Activity
+  AlertTriangle
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -50,16 +45,16 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({
   onAcknowledgeAlert: propAcknowledge
 }) => {
-  // Dynamic sensors state across the forest reserve (Bandipur - Western Ghats, India)
-  const [sensors, setSensors] = useState<FireSensor[]>(() => {
-    return INITIAL_FIRE_SENSORS.map(s => {
-      const tier = classifyFireRisk(s.temperature, s.humidity, s.smokePPM, s.carbonMonoxide, s.windSpeed);
-      const score = calculateFireRiskScore(s.temperature, s.humidity, s.smokePPM, s.carbonMonoxide, s.windSpeed);
+  // Dynamic sensors state across the basin (Indian Brahmaputra stations)
+  const [sensors, setSensors] = useState<FloodSensor[]>(() => {
+    return INITIAL_FLOOD_SENSORS.map(s => {
+      const tier = classifyFloodRisk(s.waterLevel, s.rainfallRate, s.riseRate);
+      const score = calculateRiskScore(s.waterLevel, s.rainfallRate, s.riseRate, s.soilMoisture);
       return { ...s, riskTier: tier, riskScore: score };
     });
   });
 
-  const [selectedSensor, setSelectedSensor] = useState<FireSensor | null>(null);
+  const [selectedSensor, setSelectedSensor] = useState<FloodSensor | null>(null);
   const [isLiveStreaming, setIsLiveStreaming] = useState<boolean>(true);
   const [alertSeverityFilter, setAlertSeverityFilter] = useState<'ALL' | 'CRITICAL' | 'HIGH'>('ALL');
   const [sensorHealthFilter, setSensorHealthFilter] = useState<'ALL' | 'ONLINE' | 'ALERTING'>('ALL');
@@ -67,61 +62,59 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // Derive active focus sensor
   const activeFocusSensor = selectedSensor || sensors[0];
 
-  // Dynamic raw telemetry inputs (refreshes continuously every 3 seconds)
-  const primaryTemp = activeFocusSensor.temperature;
-  const primaryMaxTemp = activeFocusSensor.maxTempToday;
-  const primaryHumidity = activeFocusSensor.humidity;
-  const primarySmoke = activeFocusSensor.smokePPM;
-  const primaryCO = activeFocusSensor.carbonMonoxide;
-  const primaryCO2 = activeFocusSensor.carbonDioxide;
-  const primaryWindSpeed = activeFocusSensor.windSpeed;
-  const primaryWindDir = activeFocusSensor.windDirection;
+  // Dynamic raw telemetry inputs (refreshes every 3 seconds)
+  const primaryWaterLevel = activeFocusSensor.waterLevel;
+  const primaryRainfall = activeFocusSensor.rainfallRate;
+  const primaryRiseRate = activeFocusSensor.riseRate;
+  const primarySoilMoisture = activeFocusSensor.soilMoisture;
 
-  // 15–30 Minute Fire Weather Danger Cycle Timeline (simulated minutes 0m to 30m)
+  // 15–30 Minute Hydrological Cycle Timeline (simulated minutes 0m to 30m)
   const [cycleMinute, setCycleMinute] = useState<number>(14);
 
   // Overall Hazard Classification & Risk Scoring:
   // Dynamically and continuously computed DIRECTLY from the live telemetry readings
-  const primaryRiskTier = useMemo<FireRiskTier>(() => {
-    return classifyFireRisk(primaryTemp, primaryHumidity, primarySmoke, primaryCO, primaryWindSpeed);
-  }, [primaryTemp, primaryHumidity, primarySmoke, primaryCO, primaryWindSpeed]);
+  const primaryRiskTier = useMemo<FloodRiskTier>(() => {
+    return classifyFloodRisk(primaryWaterLevel, primaryRainfall, primaryRiseRate);
+  }, [primaryWaterLevel, primaryRainfall, primaryRiseRate]);
 
   const primaryRiskScore = useMemo<number>(() => {
-    return calculateFireRiskScore(primaryTemp, primaryHumidity, primarySmoke, primaryCO, primaryWindSpeed);
-  }, [primaryTemp, primaryHumidity, primarySmoke, primaryCO, primaryWindSpeed]);
+    return calculateRiskScore(primaryWaterLevel, primaryRainfall, primaryRiseRate, primarySoilMoisture);
+  }, [primaryWaterLevel, primaryRainfall, primaryRiseRate, primarySoilMoisture]);
 
-  // Unified automatic state machine: computes EXTREME, HIGH, MODERATE, or LOW directly from readings
-  const activeState = useMemo<FireRiskTier>(() => {
-    return primaryRiskTier;
+  // Unified automatic state machine: computes NORMAL, WATCH, or SURGE directly from the reading's risk tier
+  const activeState = useMemo<'SURGE' | 'WATCH' | 'NORMAL'>(() => {
+    if (primaryRiskTier === 'DANGER' || primaryRiskTier === 'WARNING') return 'SURGE';
+    if (primaryRiskTier === 'WATCH') return 'WATCH';
+    return 'NORMAL';
   }, [primaryRiskTier]);
 
-  const riskMeta = FIRE_RISK_COLORS[primaryRiskTier] || FIRE_RISK_COLORS.LOW;
+  const riskMeta = RISK_COLORS[primaryRiskTier] || RISK_COLORS.SAFE;
 
-  // AI 1h to 24h Prediction (based on evaluated hazard classification)
+  // AI 1h to 30h Prediction (based on evaluated hazard classification)
   const prediction = useMemo(
-    () => getAIFirePrediction(primaryRiskScore, primaryTemp, primaryHumidity, primarySmoke, primaryWindSpeed),
-    [primaryRiskScore, primaryTemp, primaryHumidity, primarySmoke, primaryWindSpeed]
+    () => getAIPrediction(primaryRiskScore, primaryWaterLevel, primaryRainfall, primaryRiseRate),
+    [primaryRiskScore, primaryWaterLevel, primaryRainfall, primaryRiseRate]
   );
 
   // Dynamic AI Recommended Actions strictly based on user rules
   const recommendedActions = useMemo(
-    () => getAIFireRecommendations(primaryRiskTier),
+    () => getAIRecommendedActions(primaryRiskTier),
     [primaryRiskTier]
   );
 
   // Dynamic alerts generated based on evaluated hazard conditions
-  const [alerts, setAlerts] = useState<FireAlert[]>(() =>
-    generateDynamicFireAlerts(primaryRiskTier, primaryTemp, primarySmoke, primaryCO, primaryWindSpeed)
+  const [alerts, setAlerts] = useState<FloodAlert[]>(() =>
+    generateDynamicAlerts(primaryRiskTier, prediction, primaryWaterLevel, primaryRainfall)
   );
 
-  // Synchronize alerts whenever evaluated risk or reading changes
+  // Synchronize alerts whenever evaluated risk or prediction changes
   useEffect(() => {
-    setAlerts(generateDynamicFireAlerts(primaryRiskTier, primaryTemp, primarySmoke, primaryCO, primaryWindSpeed));
-  }, [primaryRiskTier, primaryTemp, primarySmoke, primaryCO, primaryWindSpeed]);
+    setAlerts(generateDynamicAlerts(primaryRiskTier, prediction, primaryWaterLevel, primaryRainfall));
+  }, [primaryRiskTier, prediction, primaryWaterLevel, primaryRainfall]);
 
-  // Real-time time series data for charts
-  const [historicalData, setHistoricalData] = useState<HistoricalFireReading[]>(() =>
-    generateHistoricalFireData(16, primaryTemp, primaryHumidity, primarySmoke, primaryWindSpeed)
+  // Real-time time series data
+  const [historicalData, setHistoricalData] = useState<HistoricalReading[]>(() =>
+    generateHistoricalData(16, primaryWaterLevel, primaryRainfall)
   );
 
   // Acknowledge Alert Handler
@@ -133,54 +126,54 @@ export const Dashboard: React.FC<DashboardProps> = ({
   };
 
   /**
-   * 15–30 Minute Fire Weather Hydrograph Model:
-   * Computes realistic canopy temperature elevation, humidity desiccation, and smoke buildup over 30 min.
-   * - Minutes 0m - 9m: Baseline / Routine Morning (Low < 30°C, > 45% hum, < 25 ppm smoke) -> LOW
-   * - Minutes 9m - 19m: Solar Heating & Dry Wind Influx (Moderate 30 - 36°C, 30 - 45% hum, 25 - 60 ppm smoke) -> MODERATE
-   * - Minutes 19m - 26m: Peak Heat & Combustion Flamefront (High/Extreme >= 38°C, <= 22% hum, >= 75 ppm smoke) -> HIGH / EXTREME
-   * - Minutes 26m - 30m: Evening Humidity Recovery (waters/moisture recover towards baseline) -> LOW
+   * 15–30 Minute Hydrological Basin Hydrograph Model:
+   * Computes realistic river stage elevation and rainfall accumulation over a 30-minute cycle.
+   * - Minutes 0m - 9m: Baseline / Routine stage (Normal < 2.0m water, < 10 mm/h rain) -> NORMAL
+   * - Minutes 9m - 19m: Catchment Inflow stage (Watch 2.0m - 3.5m water, 10 - 25 mm/h rain) -> WATCH
+   * - Minutes 19m - 26m: Peak Storm Crest stage (Surge > 4.2m water, > 40 mm/h rain) -> SURGE
+   * - Minutes 26m - 30m: Spillway Drainage / Recession stage (waters return to baseline) -> NORMAL
    */
-  const getCycleFireTarget = (minute: number) => {
+  const getCycleBasinTarget = (minute: number) => {
     const norm = ((minute % 30) + 30) % 30;
     if (norm < 9) {
-      // Low / Safe Baseline
+      // Normal / Safe Baseline
       const p = norm / 9;
       return {
-        temperature: 28.0 + p * 2.8,       // 28.0 -> 30.8°C
-        humidity: Math.round(58 - p * 14), // 58% -> 44%
-        smokePPM: Math.round(14 + p * 12), // 14 -> 26 ppm
-        carbonMonoxide: 2.5 + p * 4.5,     // 2.5 -> 7.0 ppm
-        windSpeed: Math.round(12 + p * 5), // 12 -> 17 km/h
+        waterLevel: 1.45 + p * 0.45,
+        rainfallRate: 4.5 + p * 4.5,
+        riseRate: 0.02 + p * 0.03,
+        soilMoisture: Math.round(36 + p * 10),
+        riverFlowRate: Math.round(60 + p * 30),
       };
     } else if (norm < 19) {
-      // Moderate / Heightened Dry Watch (e.g. at minute 14: temp ~34.5°C, hum ~32%, smoke ~42 ppm)
+      // Heightened Catchment Inflow / Watch Notice (e.g. at minute 14: waterLevel ~ 2.85m, rainfall ~ 18.5 mm/h)
       const p = (norm - 9) / 10;
       return {
-        temperature: 31.0 + p * 5.5,        // 31.0 -> 36.5°C
-        humidity: Math.round(44 - p * 18),  // 44% -> 26%
-        smokePPM: Math.round(26 + p * 36),  // 26 -> 62 ppm
-        carbonMonoxide: 7.0 + p * 8.5,      // 7.0 -> 15.5 ppm
-        windSpeed: Math.round(17 + p * 7),  // 17 -> 24 km/h
+        waterLevel: 2.15 + p * 1.15,
+        rainfallRate: 12.0 + p * 10.5,
+        riseRate: 0.10 + p * 0.08,
+        soilMoisture: Math.round(55 + p * 18),
+        riverFlowRate: Math.round(115 + p * 90),
       };
     } else if (norm < 26) {
-      // High to Extreme / Active Wildfire Breakout (>= 38°C, <= 20% hum, >= 75 ppm smoke)
+      // Storm Crest / Inundation Surge (> 4.2m water, > 40 mm/h rain)
       const p = (norm - 19) / 7;
       return {
-        temperature: 37.0 + p * 5.8,        // 37.0 -> 42.8°C
-        humidity: Math.round(25 - p * 10),  // 25% -> 15% (Critical Desiccation)
-        smokePPM: Math.round(65 + p * 75),  // 65 -> 140 ppm (Dense Smoke)
-        carbonMonoxide: 16.0 + p * 13.0,    // 16.0 -> 29.0 ppm
-        windSpeed: Math.round(24 + p * 8),  // 24 -> 32 km/h
+        waterLevel: 4.28 + p * 0.50,
+        rainfallRate: 41.5 + p * 9.0,
+        riseRate: 0.32 + p * 0.08,
+        soilMoisture: Math.round(87 + p * 8),
+        riverFlowRate: Math.round(290 + p * 65),
       };
     } else {
-      // Evening Moisture Recovery
+      // Recession Limb / Drainage back to baseline
       const p = (norm - 26) / 4;
       return {
-        temperature: 42.0 - p * 13.5,       // 42.0 -> 28.5°C
-        humidity: Math.round(16 + p * 40),  // 16% -> 56%
-        smokePPM: Math.round(135 - p * 115),// 135 -> 20 ppm
-        carbonMonoxide: 28.0 - p * 24.5,    // 28.0 -> 3.5 ppm
-        windSpeed: Math.round(30 - p * 17), // 30 -> 13 km/h
+        waterLevel: 4.20 - p * 2.65,
+        rainfallRate: 36.0 - p * 30.5,
+        riseRate: 0.04,
+        soilMoisture: Math.round(82 - p * 44),
+        riverFlowRate: Math.round(260 - p * 195),
       };
     }
   };
@@ -192,51 +185,47 @@ export const Dashboard: React.FC<DashboardProps> = ({
     if (!isLiveStreaming) return;
 
     const interval = setInterval(() => {
-      // Advance hydrological/weather cycle timeline
+      // Advance hydrological cycle timeline
       let nextMin = 14;
       setCycleMinute(prev => {
         nextMin = prev >= 30 ? 0.5 : Number((prev + 0.3).toFixed(2));
         return nextMin;
       });
 
-      const target = getCycleFireTarget(nextMin);
+      const basinTarget = getCycleBasinTarget(nextMin);
 
       setSensors(prev =>
         prev.map(s => {
-          const isNodeAlpha = s.id === 'FS-FIRE-01';
-          const offsetTemp = isNodeAlpha ? 0 : s.id === 'FS-FIRE-02' ? 3.5 : s.id === 'FS-FIRE-04' ? -5.5 : 1.2;
-          const offsetHum = isNodeAlpha ? 0 : s.id === 'FS-FIRE-02' ? -6 : s.id === 'FS-FIRE-04' ? 18 : -2;
-          const offsetSmoke = isNodeAlpha ? 0 : s.id === 'FS-FIRE-02' ? 45 : s.id === 'FS-FIRE-04' ? -18 : 10;
+          const isNodeAlpha = s.id === 'SN-FLD-01';
+          const offsetW = isNodeAlpha ? 0 : s.id === 'SN-FLD-04' ? -0.8 : s.id === 'SN-FLD-02' ? 0.3 : (Math.sin(s.latitude) * 0.35);
+          const offsetR = isNodeAlpha ? 0 : s.id === 'SN-FLD-04' ? -5 : s.id === 'SN-FLD-02' ? 5 : (Math.cos(s.longitude) * 4);
 
-          const targetTemp = Math.max(20, target.temperature + offsetTemp);
-          const targetHum = Math.min(85, Math.max(10, target.humidity + offsetHum));
-          const targetSmoke = Math.max(5, target.smokePPM + offsetSmoke);
+          const targetWater = Math.max(0.8, basinTarget.waterLevel + offsetW);
+          const targetRain = Math.max(0, basinTarget.rainfallRate + offsetR);
 
-          // Small natural live fluctuation (+/- 0.2°C, +/- 1% hum, +/- 2 ppm smoke)
-          const tempJitter = (Math.random() - 0.49) * 0.3;
-          const humJitter = Math.round((Math.random() - 0.5) * 1.5);
-          const smokeJitter = Math.round((Math.random() - 0.5) * 3);
-          const windJitter = Math.round((Math.random() - 0.5) * 2);
+          // Small natural live fluctuation (+/- 0.02m, +/- 0.3 mm/h)
+          const waterJitter = (Math.random() - 0.49) * 0.03;
+          const rainJitter = (Math.random() - 0.5) * 0.4;
+          const soilJitter = Math.round((Math.random() - 0.5) * 1.5);
+          const flowJitter = Math.round((Math.random() - 0.5) * 3);
 
-          // Smooth convergence to target
-          const newTemp = Math.max(18, parseFloat((s.temperature * 0.90 + targetTemp * 0.10 + tempJitter).toFixed(1)));
-          const newHum = Math.min(95, Math.max(10, Math.round(s.humidity * 0.90 + targetHum * 0.10 + humJitter)));
-          const newSmoke = Math.max(5, Math.round(s.smokePPM * 0.90 + targetSmoke * 0.10 + smokeJitter));
-          const newCO = Math.max(1, parseFloat((s.carbonMonoxide * 0.90 + target.carbonMonoxide * 0.10 + (Math.random() - 0.5) * 0.4).toFixed(1)));
-          const newWind = Math.max(5, Math.round(s.windSpeed * 0.90 + target.windSpeed * 0.10 + windJitter));
-          const newMaxTemp = Math.max(s.maxTempToday, newTemp);
+          // Smooth convergence to basin target
+          const newLevel = Math.max(0.8, parseFloat((s.waterLevel * 0.90 + targetWater * 0.10 + waterJitter).toFixed(2)));
+          const newRain = Math.max(0, parseFloat((s.rainfallRate * 0.90 + targetRain * 0.10 + rainJitter).toFixed(1)));
+          const newRise = parseFloat((basinTarget.riseRate + (Math.random() - 0.5) * 0.02).toFixed(2));
+          const newSoil = Math.min(99, Math.max(15, Math.round(basinTarget.soilMoisture + soilJitter)));
+          const newFlow = Math.max(20, Math.round(basinTarget.riverFlowRate + flowJitter));
 
-          const tier = classifyFireRisk(newTemp, newHum, newSmoke, newCO, newWind);
-          const score = calculateFireRiskScore(newTemp, newHum, newSmoke, newCO, newWind);
+          const tier = classifyFloodRisk(newLevel, newRain, newRise);
+          const score = calculateRiskScore(newLevel, newRain, newRise, newSoil);
 
           return {
             ...s,
-            temperature: newTemp,
-            maxTempToday: newMaxTemp,
-            humidity: newHum,
-            smokePPM: newSmoke,
-            carbonMonoxide: newCO,
-            windSpeed: newWind,
+            waterLevel: newLevel,
+            rainfallRate: newRain,
+            riseRate: newRise,
+            soilMoisture: newSoil,
+            riverFlowRate: newFlow,
             riskTier: tier,
             riskScore: score,
             lastPing: new Date().toISOString()
@@ -249,18 +238,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
         const now = new Date();
         const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         const last = prev[prev.length - 1];
-        const newTemp = parseFloat((last.temperature * 0.90 + target.temperature * 0.10 + (Math.random() - 0.49) * 0.3).toFixed(1));
-        const newHum = Math.min(95, Math.max(10, Math.round(last.humidity * 0.90 + target.humidity * 0.10 + (Math.random() - 0.5) * 1.5)));
-        const newSmoke = Math.max(5, Math.round(last.smokePPM * 0.90 + target.smokePPM * 0.10 + (Math.random() - 0.5) * 3));
-        const newWind = Math.max(5, Math.round(last.windSpeed * 0.90 + target.windSpeed * 0.10 + (Math.random() - 0.5) * 2));
-        const newScore = calculateFireRiskScore(newTemp, newHum, newSmoke, 10, newWind);
+        const newWater = parseFloat((last.waterLevel * 0.90 + basinTarget.waterLevel * 0.10 + (Math.random() - 0.49) * 0.03).toFixed(2));
+        const newRain = Math.max(0, parseFloat((last.rainfall * 0.90 + basinTarget.rainfallRate * 0.10 + (Math.random() - 0.5) * 0.4).toFixed(1)));
+        const newScore = calculateRiskScore(newWater, newRain);
 
         return [...prev.slice(1), {
           timestamp: timeStr,
-          temperature: newTemp,
-          humidity: newHum,
-          smokePPM: newSmoke,
-          windSpeed: newWind,
+          waterLevel: newWater,
+          rainfall: newRain,
           riskScore: newScore
         }];
       });
@@ -270,38 +255,38 @@ export const Dashboard: React.FC<DashboardProps> = ({
   }, [isLiveStreaming]);
 
   // Dynamic text generators for Top Summary Cards
-  const getTempSubtitle = (temp: number) => {
-    if (temp >= 42) return { title: 'Extreme Thermal Runaway', trend: '▲ +2.8°C/hr' };
-    if (temp >= 36) return { title: 'Critical Canopy Heating', trend: '▲ +1.6°C/hr' };
-    if (temp >= 30) return { title: 'Elevated Daytime Heat', trend: '▲ +0.8°C/hr' };
-    return { title: 'Stable Canopy Temperature', trend: '● Nominal Baseline' };
+  const getRainfallSubtitle = (rain: number) => {
+    if (rain >= 40) return { title: 'Torrential Downpour', accum: '24h: 114.2mm' };
+    if (rain >= 25) return { title: 'Heavy Rainfall', accum: '24h: 84.5mm' };
+    if (rain >= 10) return { title: 'Moderate Rain', accum: '24h: 46.8mm' };
+    return { title: 'Light Precipitation', accum: '24h: 12.4mm' };
   };
 
-  const getHumiditySubtitle = (hum: number) => {
-    if (hum <= 20) return 'Severe Canopy Desiccation';
-    if (hum <= 30) return 'Low Moisture Alert';
-    if (hum <= 45) return 'Moderate Drying Rate';
-    return 'Adequate Fuel Moisture';
+  const getWaterLevelSubtitle = (rise: number) => {
+    if (rise >= 0.30) return 'Rapid Upstream Inflow';
+    if (rise >= 0.15) return 'Steady Stage Elevation';
+    if (rise >= 0.05) return 'Moderate Inflow';
+    return 'Stable Channel Conditions';
   };
 
-  const getSmokeSubtitle = (smoke: number, co: number) => {
-    if (smoke >= 110) return { title: 'Dense Smoke Plume Detected', status: 'Active Combustion' };
-    if (smoke >= 60) return { title: 'High Particulate Concentration', status: 'Potential Fire Source' };
-    if (smoke >= 25) return { title: 'Localized Smolder Advisory', status: 'Elevated Aerosols' };
-    return { title: 'Optical Transparency Clear', status: 'Nominal Baseline' };
+  const getDisasterResponseText = (tier: string) => {
+    if (tier === 'DANGER') return 'PHASE-II ACTIVE';
+    if (tier === 'WARNING') return 'TACTICAL STANDBY';
+    if (tier === 'WATCH') return 'HEIGHTENED WATCH';
+    return 'ROUTINE MONITORING';
   };
 
-  const getDisasterResponseText = (tier: FireRiskTier) => {
-    if (tier === 'EXTREME') return 'STAGE-2 SUPPRESSION ACTIVE';
-    if (tier === 'HIGH') return 'DEPLOY RESPONSE TEAMS';
-    if (tier === 'MODERATE') return 'INCREASE FOREST PATROLS';
-    return 'ROUTINE SURVEILLANCE';
+  const getSoilMoistureText = (moisture: number) => {
+    if (moisture >= 85) return `${moisture}% Extreme`;
+    if (moisture >= 65) return `${moisture}% High`;
+    if (moisture >= 45) return `${moisture}% Moderate`;
+    return `${moisture}% Nominal`;
   };
 
-  const tempInfo = getTempSubtitle(primaryTemp);
-  const humSubtitle = getHumiditySubtitle(primaryHumidity);
-  const smokeInfo = getSmokeSubtitle(primarySmoke, primaryCO);
+  const rainInfo = getRainfallSubtitle(primaryRainfall);
+  const waterSubtitle = getWaterLevelSubtitle(primaryRiseRate);
   const disasterResponse = getDisasterResponseText(primaryRiskTier);
+  const soilMoistureDisplay = getSoilMoistureText(primarySoilMoisture);
 
   // Active alerts count
   const activeAlerts = alerts.filter(a => a.status === 'ACTIVE');
@@ -316,43 +301,35 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const filteredSensors = sensors.filter(s => {
     if (sensorHealthFilter === 'ALL') return true;
     if (sensorHealthFilter === 'ONLINE') return s.status === 'ONLINE';
-    if (sensorHealthFilter === 'ALERTING') return s.riskTier === 'EXTREME' || s.riskTier === 'HIGH';
+    if (sensorHealthFilter === 'ALERTING') return s.riskTier === 'DANGER' || s.riskTier === 'WARNING';
     return true;
   });
 
   // Export Situation Report
   const handleExportSitRep = () => {
     const sitrep = {
-      reportType: 'WILDFIRE DISASTER INCIDENT SITUATION REPORT (SITREP)',
+      reportType: 'DISASTER INCIDENT SITUATION REPORT (SITREP)',
       timestamp: new Date().toISOString(),
-      reserve: 'Bandipur - Mudumalai Western Ghats Biosphere Reserve',
+      basin: 'Brahmaputra River Catchment & Assam Floodplain Basin',
       telemetrySummary: {
-        primaryTemperature: `${primaryTemp.toFixed(1)}°C`,
-        primaryHumidity: `${primaryHumidity}%`,
-        primarySmokePPM: `${primarySmoke} ppm`,
-        primaryCarbonMonoxide: `${primaryCO} ppm`,
-        primaryWind: `${primaryWindSpeed} km/h ${primaryWindDir}`,
+        primaryWaterLevel: `${primaryWaterLevel}m`,
+        primaryRainfall: `${primaryRainfall} mm/h`,
         riskScore: primaryRiskScore,
         riskTier: primaryRiskTier,
-        affectedAreaHectares: prediction.affectedAreaHectares,
-        predictedSpreadHectares: prediction.predictedSpreadHectares,
-        villagesAtRiskCount: prediction.villagesAtRiskCount,
         activeAlertsCount: activeAlerts.length,
       },
       aiPrediction: {
         confidence: `${prediction.confidence}%`,
         currentRisk: prediction.currentRisk,
-        predictedRisk6h: prediction.predictedRisk6h,
         predictedRisk24h: prediction.predictedRisk24h,
         reason: prediction.reason,
-        projectedSpreadVelocity: `${prediction.projectedSpreadVelocity} km/h`,
+        peakCrestForecast: `${prediction.projectedPeakLevel}m at ${prediction.projectedPeakTime}`,
       },
       sensors: sensors.map(s => ({
         id: s.id,
         name: s.name,
-        temperature: `${s.temperature}°C`,
-        humidity: `${s.humidity}%`,
-        smokePPM: `${s.smokePPM} ppm`,
+        waterLevel: s.waterLevel,
+        rainfall: s.rainfallRate,
         battery: s.batteryLevel,
         status: s.status,
         riskTier: s.riskTier
@@ -363,7 +340,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `EcoGuard_Wildfire_SITREP_${Date.now()}.json`;
+    a.download = `EcoGuard_Flood_SITREP_${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -373,10 +350,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {/* ========================================================
           DISASTER OPERATIONS COMMAND CONSOLE HEADER
          ======================================================== */}
-      <div className="p-6 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-orange-500/30 shadow-2xl flex flex-wrap items-center justify-between gap-5">
+      <div className="p-6 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-cyan-500/30 shadow-2xl flex flex-wrap items-center justify-between gap-5">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-xl bg-orange-950/80 border border-orange-500/50 flex items-center justify-center text-orange-400 shadow-lg shadow-orange-950/50">
-            <Flame size={32} className="text-orange-400 animate-pulse" />
+          <div className="w-14 h-14 rounded-xl bg-cyan-950/80 border border-cyan-500/50 flex items-center justify-center text-cyan-400 shadow-lg shadow-cyan-950/50">
+            <Waves size={30} className="text-cyan-400" />
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -384,46 +361,38 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 ● EARLY WARNING DISASTER SYSTEM
               </span>
               <span className="text-slate-600 text-xs hidden sm:inline">|</span>
-              <span className="text-xs text-orange-400 font-semibold tracking-wide hidden sm:inline">
-                NATIONAL WILDFIRE RISK REDUCTION PLATFORM
+              <span className="text-xs text-cyan-400 font-semibold tracking-wide hidden sm:inline">
+                NATIONAL DISASTER RISK REDUCTION PLATFORM
               </span>
             </div>
             <h1 className="text-2xl lg:text-3xl font-black text-white tracking-tight mt-1">
-              FOREST FIRE DETECTION MONITORING
+              FLOOD DETECTION MONITORING
             </h1>
           </div>
         </div>
 
-        {/* System-Detected State Machine: Automated Readout driven strictly by sensor readings */}
+        {/* System-Detected State Machine: Surge, Watch, Normal together in one dynamic detector */}
         <div className="flex flex-wrap items-center gap-3">
           <div
-            title="Real-time detection: automatically updates between LOW, MODERATE, HIGH, and EXTREME based on live telemetry readings"
+            title="Real-time detection: automatically updates between NORMAL, WATCH, and SURGE based on live telemetry readings"
             className="flex items-center bg-slate-950/90 p-1.5 rounded-xl border border-white/10 text-xs shadow-inner gap-2 select-none"
           >
             <span className="text-[11px] text-slate-400 uppercase px-1.5 font-bold flex items-center gap-1.5">
-              <Cpu size={13} className="text-orange-400" /> DETECTION:
+              <Cpu size={13} className="text-cyan-400" /> DETECTION:
             </span>
             <span
               className={`px-3.5 py-1 rounded-lg font-black transition-all shadow flex items-center gap-2 ${
-                activeState === 'EXTREME'
+                activeState === 'SURGE'
                   ? 'bg-red-600 text-white shadow-lg shadow-red-950/60 ring-1 ring-red-400/50'
-                  : activeState === 'HIGH'
-                  ? 'bg-orange-600 text-white shadow-lg shadow-orange-950/60 ring-1 ring-orange-400/50'
-                  : activeState === 'MODERATE'
+                  : activeState === 'WATCH'
                   ? 'bg-amber-600 text-white shadow-lg shadow-amber-950/60 ring-1 ring-amber-400/50'
                   : 'bg-emerald-600 text-white shadow-lg shadow-emerald-950/60 ring-1 ring-emerald-400/50'
               }`}
             >
               <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-              {activeState === 'EXTREME'
-                ? 'EXTREME (ACTIVE FIRE)'
-                : activeState === 'HIGH'
-                ? 'HIGH FIRE RISK'
-                : activeState === 'MODERATE'
-                ? 'MODERATE (WATCH)'
-                : 'LOW (SAFE)'}
+              {activeState === 'SURGE' ? 'SURGE DETECTED' : activeState === 'WATCH' ? 'WATCH DETECTED' : 'NORMAL (SAFE)'}
             </span>
-            <span className="text-[10px] text-orange-400 font-mono px-1.5 border-l border-white/10 hidden sm:inline">
+            <span className="text-[10px] text-cyan-400 font-mono px-1.5 border-l border-white/10 hidden sm:inline">
               15-30m Cycle: T+{Math.round(cycleMinute)}m
             </span>
           </div>
@@ -449,8 +418,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* Dynamic Alert Banner: Automatically updates to match active fire risk state */}
-      {primaryRiskTier === 'EXTREME' && (
+      {/* Dynamic Alert Banner: Automatically updates to match active risk state */}
+      {primaryRiskTier === 'DANGER' && (
         <div className="p-4 rounded-xl border flex flex-wrap items-center justify-between gap-4 shadow-xl bg-red-500/15 border-red-500/55">
           <div className="flex items-center gap-3.5">
             <div className="p-2.5 rounded-lg bg-red-500/25 text-red-400 animate-bounce">
@@ -459,12 +428,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-black uppercase text-red-400 tracking-wider">
-                  ⚠️ ACTIVE WILDFIRE SUPPRESSION PROTOCOL STAGE 2
+                  ⚠️ ACTIVE FLOOD EVACUATION PROTOCOL STAGE 2
                 </span>
-                <span className="text-xs text-slate-400">· District Fire & Rescue Services Mobilized</span>
+                <span className="text-xs text-slate-400">· District Disaster Response Activated</span>
               </div>
               <p className="text-xs text-slate-200 mt-1">
-                Active crown fire confirmed at <strong>{activeFocusSensor.locationName}</strong>. Ambient temperature reached <strong>{primaryTemp.toFixed(1)}°C</strong> with smoke particulate at <strong>{primarySmoke} ppm</strong>. Flamefront spread velocity estimated at 4.8 km/h.
+                Brahmaputra Hydro Node Alpha recorded stage height at <strong>{primaryWaterLevel.toFixed(2)}m</strong> (breaching 4.20m max safety limit). Inundation peak expected within 45 minutes.
               </p>
             </div>
           </div>
@@ -474,7 +443,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       )}
 
-      {primaryRiskTier === 'HIGH' && (
+      {primaryRiskTier === 'WARNING' && (
         <div className="p-4 rounded-xl border flex flex-wrap items-center justify-between gap-4 shadow-xl bg-orange-500/15 border-orange-500/50">
           <div className="flex items-center gap-3.5">
             <div className="p-2.5 rounded-lg bg-orange-500/25 text-orange-400">
@@ -483,12 +452,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-black uppercase text-orange-400 tracking-wider">
-                  ⚠️ WILDFIRE HIGH RISK ADVISORY · Extreme Dry Fuel & Smoke Influx
+                  ⚠️ FLOOD WARNING ADVISORY · Rapid River Rise Detected
                 </span>
-                <span className="text-xs text-slate-400">· Quick Response Strike Teams on Standby</span>
+                <span className="text-xs text-slate-400">· Emergency Response Standby</span>
               </div>
               <p className="text-xs text-slate-200 mt-1">
-                Canopy temperature elevated to <strong>{primaryTemp.toFixed(1)}°C</strong> with humidity depleted to <strong>{primaryHumidity}%</strong>. Smoke concentration reached <strong>{primarySmoke} ppm</strong> with CO at <strong>{primaryCO.toFixed(1)} ppm</strong>.
+                Water level reached <strong>{primaryWaterLevel.toFixed(2)}m</strong> (approaching 4.20m danger limit). Quick-response boat squads and mobile pumps placed on 15-minute standby.
               </p>
             </div>
           </div>
@@ -498,7 +467,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       )}
 
-      {primaryRiskTier === 'MODERATE' && (
+      {primaryRiskTier === 'WATCH' && (
         <div className="p-4 rounded-xl border flex flex-wrap items-center justify-between gap-4 shadow-xl bg-amber-500/10 border-amber-500/40">
           <div className="flex items-center gap-3.5">
             <div className="p-2.5 rounded-lg bg-amber-500/20 text-amber-400">
@@ -507,12 +476,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-black uppercase text-amber-400 tracking-wider">
-                  ℹ️ FOREST FIRE WATCH NOTICE · Low Humidity & High Wind Advisory
+                  ℹ️ HYDROLOGICAL WATCH NOTICE · Catchment Precipitation Advisory
                 </span>
-                <span className="text-xs text-slate-400">· Ranger Patrols Accelerated</span>
+                <span className="text-xs text-slate-400">· Monitoring Polling Accelerated</span>
               </div>
               <p className="text-xs text-slate-200 mt-1">
-                Canopy temperature at <strong>{primaryTemp.toFixed(1)}°C</strong> with relative humidity at <strong>{primaryHumidity}%</strong> and sustained wind gusts at <strong>{primaryWindSpeed} km/h {primaryWindDir}</strong>. Heightened watch over dry deciduous undergrowth.
+                River stage elevated to <strong>{primaryWaterLevel.toFixed(2)}m</strong> with rainfall rate <strong>{primaryRainfall.toFixed(1)} mm/h</strong>. Polling frequency increased to 1-minute automated sync.
               </p>
             </div>
           </div>
@@ -522,7 +491,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       )}
 
-      {primaryRiskTier === 'LOW' && (
+      {primaryRiskTier === 'SAFE' && (
         <div className="p-4 rounded-xl border flex flex-wrap items-center justify-between gap-4 shadow-xl bg-emerald-500/10 border-emerald-500/35">
           <div className="flex items-center gap-3.5">
             <div className="p-2.5 rounded-lg bg-emerald-500/20 text-emerald-400">
@@ -531,12 +500,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-black uppercase text-emerald-400 tracking-wider">
-                  ✓ ALL FOREST SECTORS NOMINAL · Continuous AI Thermal Surveillance Active
+                  ✓ ALL BASIN SECTORS NOMINAL · Continuous AI Surveillance Active
                 </span>
-                <span className="text-xs text-slate-400">· Optimal Canopy Moisture Baseline</span>
+                <span className="text-xs text-slate-400">· Seasonal Hydrological Baseline</span>
               </div>
               <p className="text-xs text-slate-200 mt-1">
-                Current temperature <strong>{primaryTemp.toFixed(1)}°C</strong>, humidity <strong>{primaryHumidity}%</strong>, and smoke concentration <strong>{primarySmoke} ppm</strong> remain well within safe baseline thresholds.
+                Current water level <strong>{primaryWaterLevel.toFixed(2)}m</strong> and rainfall rate <strong>{primaryRainfall.toFixed(1)} mm/h</strong> remain well below watch thresholds.
               </p>
             </div>
           </div>
@@ -548,57 +517,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* ========================================================
           SECTION 1: TOP SUMMARY CARDS
-          1. Current Temperature (Thermal Sensor)
-          2. Current Humidity & Wind (Atmospheric Sensor)
-          3. Smoke & Gas Monitoring (Combustion Sensor)
-          4. Current Fire Risk Level (Hazard Classification)
+          1. Current Water Level
+          2. Current Rainfall
+          3. Current Flood Risk Level
+          4. Number of Active Alerts
          ======================================================== */}
       <div>
-        <div className="text-[11px] font-bold uppercase tracking-wider text-orange-400 mb-3 px-1">
+        <div className="text-[11px] font-bold uppercase tracking-wider text-cyan-400 mb-3 px-1">
           SECTION 1 · REAL-TIME TELEMETRIC SUMMARY
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Card 1: Current Temperature */}
-          <div
-            className="field-panel p-5 rounded-xl relative overflow-hidden flex flex-col justify-between"
-            style={{
-              background: 'linear-gradient(150deg, rgba(15,23,42,0.95) 0%, rgba(10,15,26,0.98) 100%)',
-              border: '1px solid rgba(249,115,22,0.3)',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.35)'
-            }}
-          >
-            <div className="flex items-start justify-between">
-              <div>
-                <span className="text-[11px] uppercase font-bold text-orange-400 tracking-wider">
-                  Thermal Sensor
-                </span>
-                <div className="text-base font-bold text-white mt-0.5">Current Temperature</div>
-              </div>
-              <div className="w-10 h-10 rounded-lg bg-orange-500/10 border border-orange-500/30 flex items-center justify-center text-orange-400">
-                <Thermometer size={20} />
-              </div>
-            </div>
-
-            <div className="my-3">
-              <div className="flex items-baseline gap-2">
-                <span className="text-4xl font-black text-orange-300 font-mono tracking-tight">
-                  {primaryTemp.toFixed(1)}
-                </span>
-                <span className="text-sm font-semibold text-slate-400">°C</span>
-              </div>
-              <div className="flex items-center gap-2 text-xs font-semibold text-orange-400 mt-1">
-                <span>{tempInfo.trend}</span>
-                <span className="text-slate-500">· {tempInfo.title}</span>
-              </div>
-            </div>
-
-            <div className="text-xs text-slate-400 pt-2.5 border-t border-white/5 flex justify-between">
-              <span>Maximum Today:</span>
-              <strong className="text-red-400 font-mono">{primaryMaxTemp.toFixed(1)}°C</strong>
-            </div>
-          </div>
-
-          {/* Card 2: Current Humidity & Wind */}
+          {/* Card 1: Current Water Level */}
           <div
             className="field-panel p-5 rounded-xl relative overflow-hidden flex flex-col justify-between"
             style={{
@@ -610,79 +539,75 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div className="flex items-start justify-between">
               <div>
                 <span className="text-[11px] uppercase font-bold text-cyan-400 tracking-wider">
-                  Atmospheric Sensor
+                  Hydrological Sensor
                 </span>
-                <div className="text-base font-bold text-white mt-0.5">Current Humidity</div>
+                <div className="text-base font-bold text-white mt-0.5">Current Water Level</div>
               </div>
               <div className="w-10 h-10 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
-                <Droplets size={20} />
+                <Waves size={20} />
               </div>
             </div>
 
             <div className="my-3">
               <div className="flex items-baseline gap-2">
                 <span className="text-4xl font-black text-cyan-300 font-mono tracking-tight">
-                  {primaryHumidity}
+                  {primaryWaterLevel.toFixed(2)}
                 </span>
-                <span className="text-sm font-semibold text-slate-400">%</span>
+                <span className="text-sm font-semibold text-slate-400">meters</span>
               </div>
               <div className="flex items-center gap-2 text-xs font-semibold text-cyan-400 mt-1">
-                <span>Wind: {primaryWindSpeed} km/h {primaryWindDir}</span>
-                <span className="text-slate-500">· {humSubtitle}</span>
+                <span>▲ +{primaryRiseRate.toFixed(2)} m/hr</span>
+                <span className="text-slate-500">· {waterSubtitle}</span>
               </div>
             </div>
 
             <div className="text-xs text-slate-400 pt-2.5 border-t border-white/5 flex justify-between">
-              <span>Critical Desiccation:</span>
-              <strong className={primaryHumidity <= 25 ? 'text-red-400 font-mono' : 'text-amber-400 font-mono'}>
-                {primaryHumidity <= 25 ? '⚠️ < 25% Critical' : 'Safe > 30%'}
-              </strong>
+              <span>Danger Limit:</span>
+              <strong className="text-red-400 font-mono">{activeFocusSensor.floodThreshold.toFixed(2)}m</strong>
             </div>
           </div>
 
-          {/* Card 3: Smoke & Gas Monitoring */}
+          {/* Card 2: Current Rainfall */}
           <div
             className="field-panel p-5 rounded-xl relative overflow-hidden flex flex-col justify-between"
             style={{
               background: 'linear-gradient(150deg, rgba(15,23,42,0.95) 0%, rgba(10,15,26,0.98) 100%)',
-              border: '1px solid rgba(245,158,11,0.3)',
+              border: '1px solid rgba(129,140,248,0.3)',
               boxShadow: '0 8px 24px rgba(0,0,0,0.35)'
             }}
           >
             <div className="flex items-start justify-between">
               <div>
-                <span className="text-[11px] uppercase font-bold text-amber-400 tracking-wider">
-                  Combustion Sensor
+                <span className="text-[11px] uppercase font-bold text-indigo-400 tracking-wider">
+                  Precipitation Gauge
                 </span>
-                <div className="text-base font-bold text-white mt-0.5">Smoke & Gas Detection</div>
+                <div className="text-base font-bold text-white mt-0.5">Current Rainfall</div>
               </div>
-              <div className="w-10 h-10 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
-                <CloudFog size={20} />
+              <div className="w-10 h-10 rounded-lg bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                <CloudRain size={20} />
               </div>
             </div>
 
             <div className="my-3">
               <div className="flex items-baseline gap-2">
-                <span className="text-4xl font-black text-amber-300 font-mono tracking-tight">
-                  {primarySmoke}
+                <span className="text-4xl font-black text-indigo-300 font-mono tracking-tight">
+                  {primaryRainfall.toFixed(1)}
                 </span>
-                <span className="text-sm font-semibold text-slate-400">ppm</span>
+                <span className="text-sm font-semibold text-slate-400">mm/hr</span>
               </div>
-              <div className="flex items-center gap-2 text-xs font-semibold text-amber-400 mt-1">
-                <span>CO: {primaryCO.toFixed(1)} ppm</span>
-                <span className="text-slate-500">· CO₂: {primaryCO2} ppm</span>
+              <div className="flex items-center gap-2 text-xs font-semibold text-indigo-400 mt-1">
+                <span>{rainInfo.title}</span>
+                <span className="text-slate-500">· {rainInfo.accum}</span>
               </div>
             </div>
 
             <div className="text-xs text-slate-400 pt-2.5 border-t border-white/5 flex justify-between">
-              <span>Smoke Alert Status:</span>
-              <strong className={primarySmoke >= 60 ? 'text-red-400 font-mono' : 'text-emerald-400 font-mono'}>
-                {smokeInfo.status}
-              </strong>
+              <span>Runoff Saturation:</span>
+              <strong className="text-amber-400 font-mono">{soilMoistureDisplay}</strong>
             </div>
           </div>
 
-          {/* Card 4: Current Fire Risk Level */}
+          {/* Card 3: Current Flood Risk Level */}
           <div
             className="field-panel p-5 rounded-xl relative overflow-hidden flex flex-col justify-between"
             style={{
@@ -696,13 +621,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <span className="text-[11px] uppercase font-bold text-slate-400 tracking-wider">
                   Hazard Classification
                 </span>
-                <div className="text-base font-bold text-white mt-0.5">Current Fire Risk Level</div>
+                <div className="text-base font-bold text-white mt-0.5">Current Flood Risk Level</div>
               </div>
               <div
                 className="w-10 h-10 rounded-lg flex items-center justify-center shadow-sm"
                 style={{ background: riskMeta.bg, border: `1px solid ${riskMeta.border}` }}
               >
-                <Flame size={20} color={riskMeta.color} />
+                <ShieldAlert size={20} color={riskMeta.color} />
               </div>
             </div>
 
@@ -716,13 +641,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </span>
               </div>
               <div className="text-xs text-slate-300 mt-1 font-medium">
-                {primaryRiskTier === 'EXTREME'
-                  ? 'Active Wildfire Inundation'
-                  : primaryRiskTier === 'HIGH'
-                  ? 'High Surface Fire Ignition'
-                  : primaryRiskTier === 'MODERATE'
-                  ? 'Heightened Forest Dry Watch'
-                  : 'Canopy Conditions Nominal'}
+                {primaryRiskTier === 'DANGER'
+                  ? 'Severe Inundation Imminent'
+                  : primaryRiskTier === 'WARNING'
+                  ? 'Spillway & River Surge Warning'
+                  : primaryRiskTier === 'WATCH'
+                  ? 'Heightened Basin Watch'
+                  : 'Catchment Flow Nominal'}
               </div>
             </div>
 
@@ -731,110 +656,94 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <strong style={{ color: riskMeta.text }} className="font-semibold">{disasterResponse}</strong>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* ========================================================
-          SECTION 1B: AFFECTED AREA ESTIMATION & RAPID DISPATCH (FEATURE 10)
-         ======================================================== */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 -mt-3">
-        <div className="p-3.5 rounded-xl bg-slate-900/80 border border-white/10 flex items-center justify-between">
-          <div>
-            <span className="text-[10px] text-slate-400 uppercase font-semibold">Affected Area</span>
-            <div className="text-lg font-black text-white font-mono mt-0.5">
-              {prediction.affectedAreaHectares} <span className="text-xs text-slate-400 font-normal">Hectares</span>
+          {/* Card 4: Number of Active Alerts */}
+          <div
+            className="field-panel p-5 rounded-xl relative overflow-hidden flex flex-col justify-between"
+            style={{
+              background: 'linear-gradient(150deg, rgba(30,15,15,0.95) 0%, rgba(15,10,10,0.98) 100%)',
+              border: activeAlerts.length > 0 ? '1px solid rgba(239,68,68,0.4)' : '1px solid rgba(255,255,255,0.1)',
+              boxShadow: activeAlerts.length > 0 ? '0 8px 24px rgba(239,68,68,0.15)' : 'none'
+            }}
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <span className="text-[11px] uppercase font-bold text-red-400 tracking-wider">
+                  Emergency Dispatch
+                </span>
+                <div className="text-base font-bold text-white mt-0.5">Number of Active Alerts</div>
+              </div>
+              <div className="w-10 h-10 rounded-lg bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-400">
+                <BellRing size={20} className={activeAlerts.length > 0 ? 'animate-bounce' : ''} />
+              </div>
             </div>
-          </div>
-          <div className="w-8 h-8 rounded-lg bg-orange-500/10 border border-orange-500/30 flex items-center justify-center text-orange-400">
-            <Flame size={16} />
-          </div>
-        </div>
 
-        <div className="p-3.5 rounded-xl bg-slate-900/80 border border-white/10 flex items-center justify-between">
-          <div>
-            <span className="text-[10px] text-slate-400 uppercase font-semibold">Predicted Spread (6 Hours)</span>
-            <div className="text-lg font-black text-orange-400 font-mono mt-0.5">
-              {prediction.predictedSpreadHectares} <span className="text-xs text-slate-400 font-normal">Hectares</span>
+            <div className="my-3">
+              <div className="flex items-baseline gap-2">
+                <span className="text-4xl font-black text-red-400 font-mono tracking-tight">
+                  {activeAlerts.length}
+                </span>
+                <span className="text-sm font-semibold text-slate-400">Active Incidents</span>
+              </div>
+              <div className="text-xs text-red-300 mt-1">
+                <strong>{criticalAlertsCount} Critical Hazards</strong> · {warningAlertsCount} Warning
+              </div>
             </div>
-          </div>
-          <div className="w-8 h-8 rounded-lg bg-orange-500/10 border border-orange-500/30 flex items-center justify-center text-orange-400">
-            <Compass size={16} />
-          </div>
-        </div>
 
-        <div className="p-3.5 rounded-xl bg-slate-900/80 border border-white/10 flex items-center justify-between">
-          <div>
-            <span className="text-[10px] text-slate-400 uppercase font-semibold">Nearby Villages at Risk</span>
-            <div className="text-lg font-black text-amber-300 font-mono mt-0.5">
-              {prediction.villagesAtRiskCount} <span className="text-xs text-slate-400 font-normal">Settlements</span>
+            <div className="text-xs text-slate-400 pt-2.5 border-t border-white/5 flex justify-between">
+              <span>Avg Emergency Response:</span>
+              <strong className="text-emerald-400 font-semibold">&lt; 4 minutes</strong>
             </div>
-          </div>
-          <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
-            <Home size={16} />
-          </div>
-        </div>
-
-        <div className="p-3.5 rounded-xl bg-slate-900/80 border border-white/10 flex items-center justify-between">
-          <div>
-            <span className="text-[10px] text-slate-400 uppercase font-semibold">Active Fire Alerts</span>
-            <div className="text-lg font-black text-red-400 font-mono mt-0.5">
-              {activeAlerts.length} <span className="text-xs text-slate-400 font-normal">({criticalAlertsCount} Critical)</span>
-            </div>
-          </div>
-          <div className="w-8 h-8 rounded-lg bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-400">
-            <BellRing size={16} />
           </div>
         </div>
       </div>
 
       {/* ========================================================
-          SECTION 2: FIRE RISK INDICATOR (LARGE VISUAL GAUGE)
+          SECTION 2: FLOOD RISK INDICATOR (LARGE VISUAL GAUGE)
          ======================================================== */}
       <div>
-        <FireGauge
+        <FloodGauge
           score={primaryRiskScore}
           tier={primaryRiskTier}
-          temperature={primaryTemp}
-          humidity={primaryHumidity}
-          smokePPM={primarySmoke}
-          windSpeed={primaryWindSpeed}
+          waterLevel={primaryWaterLevel}
+          rateOfRise={primaryRiseRate}
         />
       </div>
 
       {/* ========================================================
-          SECTION 3: AI FOREST FIRE PREDICTION PANEL (1h, 3h, 6h, 12h, 24h)
+          SECTION 3: AI FLOOD PREDICTION PANEL (1h to 30h FORECAST)
          ======================================================== */}
       <div>
         <AIPredictionPanel prediction={prediction} />
       </div>
 
       {/* ========================================================
-          SECTIONS 4 & 5: TEMPERATURE, SMOKE, HUMIDITY & WIND CHARTS
+          SECTIONS 4 & 5: WATER LEVEL TREND CHART & RAINFALL TREND CHART
          ======================================================== */}
       <div>
         <Charts
           historicalData={historicalData}
-          criticalTempThreshold={40.0}
-          warningTempThreshold={35.0}
-          criticalHumidityThreshold={25.0}
+          floodThreshold={activeFocusSensor.floodThreshold}
+          warningThreshold={activeFocusSensor.warningThreshold}
+          heavyRainThreshold={35.0}
         />
       </div>
 
       {/* ========================================================
-          SECTION 6: INTERACTIVE FIRE SPREAD PREDICTION MAP (FULL WIDTH)
+          SECTION 6: INTERACTIVE FLOOD RISK MAP (FULL WIDTH)
          ======================================================== */}
       <div>
         <div className="flex flex-wrap items-center justify-between gap-3 mb-3 px-1">
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-wider text-orange-400 flex items-center gap-1.5">
-              <Layers size={14} /> SECTION 6 · GEOSPATIAL WILDFIRE SPREAD NETWORK
+            <div className="text-[11px] font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
+              <Layers size={14} /> SECTION 6 · GEOSPATIAL HYDROLOGY NETWORK
             </div>
             <h2 className="text-xl font-bold text-white tracking-tight">
-              Interactive Fire Spread Prediction Map
+              Interactive Flood Risk Map
             </h2>
           </div>
           <span className="text-xs text-slate-300 font-medium">
-            Displaying all {sensors.length} forest sensors, active fire zones, predicted spread perimeters, nearby villages & response bases
+            Displaying all {sensors.length} sensor locations across river basin and dam spillways
           </span>
         </div>
 
@@ -846,7 +755,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       {/* ========================================================
-          SECTION 7: ACTIVE FIRE ALERTS SECTION (FULL WIDTH)
+          SECTION 7: ACTIVE ALERTS SECTION (FULL WIDTH)
          ======================================================== */}
       <div
         className="field-panel p-6 rounded-xl flex flex-col justify-between"
@@ -863,10 +772,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
             <div>
               <div className="text-[11px] font-bold uppercase tracking-wider text-red-400">
-                SECTION 7 · EMERGENCY WILDFIRE DISPATCH FEED
+                SECTION 7 · EMERGENCY TELEMETRY DISPATCH FEED
               </div>
               <h2 className="text-xl font-bold text-white tracking-tight">
-                Active Fire Alerts ({activeAlerts.length})
+                Active Hazard Alerts ({activeAlerts.length})
               </h2>
             </div>
           </div>
@@ -908,7 +817,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           {filteredAlerts.length === 0 ? (
             <div className="p-8 rounded-xl bg-slate-900/50 border border-white/5 text-center text-slate-400 text-sm">
               <CheckCircle2 size={28} className="text-emerald-400 mx-auto mb-2" />
-              No active fire alerts matching filter. All monitored sectors nominal.
+              No active alerts matching filter. All monitored sectors nominal.
             </div>
           ) : (
             filteredAlerts.map(alert => (
@@ -950,7 +859,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
             <div>
               <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-400">
-                SECTION 9 · FOREST SENSOR NETWORK TELEMETRY STATUS
+                SECTION 9 · HYDROLOGICAL SENSOR NETWORK STATUS
               </div>
               <h2 className="text-xl font-bold text-white tracking-tight">
                 Sensor Health Monitoring
@@ -966,7 +875,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <button
               onClick={() => setSensorHealthFilter('ALL')}
               className={`px-3 py-1 rounded-lg transition-all font-bold ${
-                sensorHealthFilter === 'ALL' ? 'bg-orange-600 text-white' : 'text-slate-400 hover:text-white'
+                sensorHealthFilter === 'ALL' ? 'bg-cyan-600 text-white' : 'text-slate-400 hover:text-white'
               }`}
             >
               All Nodes ({sensors.length})
@@ -985,7 +894,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 sensorHealthFilter === 'ALERTING' ? 'bg-red-600 text-white' : 'text-slate-400 hover:text-white'
               }`}
             >
-              Elevated Risk ({sensors.filter(s => s.riskTier === 'EXTREME' || s.riskTier === 'HIGH').length})
+              Elevated Risk ({sensors.filter(s => s.riskTier === 'DANGER' || s.riskTier === 'WARNING').length})
             </button>
           </div>
         </div>

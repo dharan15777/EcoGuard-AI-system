@@ -1,25 +1,25 @@
 import React, { useState } from 'react';
-import { AIFirePredictionData, HourlyFirePrediction } from '../types/fire';
-import { FIRE_RISK_COLORS } from '../utils/fireConstants';
-import { Brain, Sparkles, Clock, AlertTriangle, Flame, CheckCircle2, Cpu, Wind, Droplets, Compass } from 'lucide-react';
+import { AIPredictionData, HourlyPrediction } from '../types/flood';
+import { RISK_COLORS } from '../utils/floodConstants';
+import { Brain, Sparkles, Clock, AlertTriangle, CloudRain, CheckCircle2, Cpu } from 'lucide-react';
 
 interface AIPredictionPanelProps {
-  prediction: AIFirePredictionData;
+  prediction: AIPredictionData;
 }
 
 export const AIPredictionPanel: React.FC<AIPredictionPanelProps> = ({ prediction }) => {
-  const [selectedHour, setSelectedHour] = useState<HourlyFirePrediction>(
-    prediction.hourlyForecast.find(h => h.horizonHours === 6) || prediction.hourlyForecast[0]
+  const [selectedHour, setSelectedHour] = useState<HourlyPrediction>(
+    prediction.hourlyForecast[4] || prediction.hourlyForecast[0] // default to 24h or first
   );
 
-  const currentRiskMeta = FIRE_RISK_COLORS[prediction.currentRisk] || FIRE_RISK_COLORS.LOW;
-  const predRisk6Meta = FIRE_RISK_COLORS[prediction.predictedRisk6h] || FIRE_RISK_COLORS.EXTREME;
+  const currentRiskMeta = RISK_COLORS[prediction.currentRisk] || RISK_COLORS.SAFE;
+  const predRisk24Meta = RISK_COLORS[prediction.predictedRisk24h] || RISK_COLORS.DANGER;
 
   // Keep selected hour in sync when prediction changes
   React.useEffect(() => {
     setSelectedHour(prev => {
       const match = prediction.hourlyForecast.find(h => h.horizonHours === prev.horizonHours);
-      return match || prediction.hourlyForecast.find(h => h.horizonHours === 6) || prediction.hourlyForecast[0];
+      return match || prediction.hourlyForecast[4] || prediction.hourlyForecast[0];
     });
   }, [prediction]);
 
@@ -28,31 +28,31 @@ export const AIPredictionPanel: React.FC<AIPredictionPanelProps> = ({ prediction
       className="field-panel p-6 rounded-xl relative overflow-hidden"
       style={{
         background: 'linear-gradient(160deg, rgba(15,23,42,0.95) 0%, rgba(10,15,26,0.98) 100%)',
-        border: '1px solid rgba(249,115,22,0.3)',
+        border: '1px solid rgba(56,189,248,0.25)',
         boxShadow: '0 8px 24px rgba(0,0,0,0.35)'
       }}
     >
       {/* Top Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6 pb-4 border-b border-white/10">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-orange-950/70 border border-orange-500/40 flex items-center justify-center text-orange-400 shadow-sm shadow-orange-900/30">
-            <Brain size={22} className="text-orange-400" />
+          <div className="w-10 h-10 rounded-lg bg-cyan-950/70 border border-cyan-500/40 flex items-center justify-center text-cyan-400 shadow-sm shadow-cyan-900/30">
+            <Brain size={22} className="text-cyan-400" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-orange-400 flex items-center gap-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-1">
                 <Sparkles size={12} /> SECTION 3 · ARTIFICIAL INTELLIGENCE INFERENCE ENGINE
               </span>
             </div>
             <h2 className="text-xl font-bold text-white tracking-tight">
-              AI Forest Fire Spread Prediction (1h, 3h, 6h, 12h, 24h Horizons)
+              AI Flood Prediction & 30-Hour Inundation Horizon
             </h2>
           </div>
         </div>
 
-        {/* Display: Current Fire Risk & Predicted Fire Risk (6 Hours) & Confidence */}
+        {/* Display: Current Flood Risk & Predicted Flood Risk (24 Hours) & Confidence */}
         <div className="flex flex-wrap items-center gap-3">
-          {/* Current Fire Risk */}
+          {/* Current Flood Risk */}
           <div className="p-2.5 px-3.5 rounded-xl bg-slate-900/90 border border-white/10 text-right">
             <div className="text-[10px] text-slate-400 uppercase font-semibold">Current Risk</div>
             <div
@@ -64,27 +64,27 @@ export const AIPredictionPanel: React.FC<AIPredictionPanelProps> = ({ prediction
             </div>
           </div>
 
-          {/* Predicted Fire Risk (6 Hours) */}
+          {/* Predicted Flood Risk (24 Hours) */}
           <div
             className="p-2.5 px-3.5 rounded-xl border text-right shadow-sm"
             style={{
-              background: predRisk6Meta.bg,
-              borderColor: predRisk6Meta.border
+              background: predRisk24Meta.bg,
+              borderColor: predRisk24Meta.border
             }}
           >
-            <div className="text-[10px] uppercase font-semibold text-slate-300">Predicted Risk (6 Hours)</div>
+            <div className="text-[10px] uppercase font-semibold text-slate-300">Predicted Risk (24 Hours)</div>
             <div
               className="text-base font-bold uppercase tracking-wide flex items-center gap-1 mt-0.5"
-              style={{ color: predRisk6Meta.text }}
+              style={{ color: predRisk24Meta.text }}
             >
-              <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: predRisk6Meta.color }} />
-              {prediction.predictedRisk6h}
+              <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: predRisk24Meta.color }} />
+              {prediction.predictedRisk24h}
             </div>
           </div>
 
           {/* Confidence */}
           <div className="p-2.5 px-3.5 rounded-xl bg-slate-900/90 border border-white/10 text-right">
-            <div className="text-[10px] text-slate-400 uppercase font-semibold">Confidence Score</div>
+            <div className="text-[10px] text-slate-400 uppercase font-semibold">Confidence</div>
             <div className="text-base font-bold text-emerald-400 font-mono flex items-center gap-1 mt-0.5">
               <CheckCircle2 size={15} /> {prediction.confidence}%
             </div>
@@ -99,8 +99,8 @@ export const AIPredictionPanel: React.FC<AIPredictionPanelProps> = ({ prediction
         </div>
         <div className="flex-1">
           <div className="text-xs uppercase font-bold text-amber-300 tracking-wider mb-1 flex items-center gap-2">
-            <span>Reason for AI Wildfire Prediction</span>
-            <span className="text-slate-400">· DeepForest-PyroNet Neural Synthesis</span>
+            <span>Reason for AI Prediction</span>
+            <span className="text-slate-400">· Edge Neural Synthesis</span>
           </div>
           <p className="text-sm font-medium text-slate-100 leading-relaxed">
             "{prediction.reason}"
@@ -108,23 +108,23 @@ export const AIPredictionPanel: React.FC<AIPredictionPanelProps> = ({ prediction
         </div>
       </div>
 
-      {/* 1-Hour to 24-Hour Horizon Timeline across Full Width */}
+      {/* 6-Hour to 30-Hour Horizon Timeline across Full Width */}
       <div className="mb-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
-            <Clock size={14} className="text-orange-400" />
-            <span>AI Projected Trajectory (1h, 3h, 6h, 12h, 24h Horizons)</span>
+            <Clock size={14} className="text-cyan-400" />
+            <span>AI Projected Trajectory (1h, 3h, 6h, 12h, 24h, 30h Horizons)</span>
           </div>
           <span className="text-xs text-slate-400">
-            Click any horizon to inspect projected temperature, humidity, wind & risk tier
+            Click horizon to view projected water level & risk
           </span>
         </div>
 
-        {/* 5 Horizons Cards (1 Hour, 3 Hours, 6 Hours, 12 Hours, 24 Hours) */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        {/* 6 Horizons Cards (1 Hour, 3 Hours, 6 Hours, 12 Hours, 24 Hours, 30 Hours) */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {prediction.hourlyForecast.map((hf) => {
             const isSelected = selectedHour.horizonHours === hf.horizonHours;
-            const riskMeta = FIRE_RISK_COLORS[hf.riskTier] || FIRE_RISK_COLORS.LOW;
+            const riskMeta = RISK_COLORS[hf.riskTier] || RISK_COLORS.SAFE;
 
             return (
               <button
@@ -132,7 +132,7 @@ export const AIPredictionPanel: React.FC<AIPredictionPanelProps> = ({ prediction
                 onClick={() => setSelectedHour(hf)}
                 className={`p-3.5 rounded-xl text-left transition-all border flex flex-col justify-between ${
                   isSelected
-                    ? 'bg-slate-800 border-orange-400 shadow-lg ring-2 ring-orange-400/40'
+                    ? 'bg-slate-800 border-cyan-400 shadow-lg ring-2 ring-cyan-400/40'
                     : 'bg-slate-900/60 border-white/10 hover:border-white/20 hover:bg-slate-800/60'
                 }`}
               >
@@ -142,16 +142,9 @@ export const AIPredictionPanel: React.FC<AIPredictionPanelProps> = ({ prediction
                 </div>
 
                 <div className="mb-3">
-                  <span className="text-[10px] text-slate-400 block font-medium">Projected Temp</span>
-                  <div className="text-xl font-bold text-orange-300 font-mono mt-0.5">
-                    {hf.temperature.toFixed(1)}°C
-                  </div>
-                  <div className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
-                    <Droplets size={11} className="text-cyan-400" />
-                    <span>{hf.humidity}% Hum</span>
-                    <span className="text-slate-600">·</span>
-                    <Wind size={11} className="text-amber-400" />
-                    <span>{hf.windSpeed} km/h</span>
+                  <span className="text-[10px] text-slate-400 block font-medium">Predicted Level</span>
+                  <div className="text-xl font-bold text-cyan-300 font-mono mt-0.5">
+                    {hf.waterLevel.toFixed(2)}m
                   </div>
                 </div>
 
@@ -166,8 +159,8 @@ export const AIPredictionPanel: React.FC<AIPredictionPanelProps> = ({ prediction
                   >
                     {hf.riskTier}
                   </span>
-                  <span className="text-xs font-mono text-slate-300 font-semibold">
-                    Score: {hf.riskScore}
+                  <span className="text-xs font-mono text-indigo-300 flex items-center gap-1 font-semibold">
+                    <CloudRain size={12} /> {hf.rainfall.toFixed(0)}mm
                   </span>
                 </div>
               </button>
@@ -179,7 +172,7 @@ export const AIPredictionPanel: React.FC<AIPredictionPanelProps> = ({ prediction
       {/* Selected Horizon Telemetry Detail & Neural Model Metadata */}
       <div className="p-3.5 rounded-xl bg-slate-900/80 border border-white/10 flex flex-wrap items-center justify-between gap-4 text-xs">
         <div className="flex items-center gap-2.5">
-          <span className="px-2 py-0.5 rounded bg-orange-500/20 text-orange-300 font-bold font-mono">
+          <span className="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold font-mono">
             {selectedHour.hour} ({selectedHour.timeLabel}) Projection
           </span>
           <span className="text-slate-200 font-medium">
@@ -188,11 +181,6 @@ export const AIPredictionPanel: React.FC<AIPredictionPanelProps> = ({ prediction
         </div>
 
         <div className="flex items-center gap-4 text-slate-400 ml-auto">
-          <span className="flex items-center gap-1.5">
-            <Compass size={14} className="text-amber-400" />
-            <span>Spread Velocity: <strong className="text-white font-mono">{prediction.projectedSpreadVelocity} km/h</strong></span>
-          </span>
-          <span>·</span>
           <span className="flex items-center gap-1.5">
             <Cpu size={14} className="text-cyan-400" />
             <span>Model: <strong>{prediction.modelName}</strong></span>
@@ -204,5 +192,3 @@ export const AIPredictionPanel: React.FC<AIPredictionPanelProps> = ({ prediction
     </div>
   );
 };
-
-export default AIPredictionPanel;

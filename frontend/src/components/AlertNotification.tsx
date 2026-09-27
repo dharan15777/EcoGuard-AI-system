@@ -1,9 +1,9 @@
 import React from 'react';
-import { FireAlert } from '../types/fire';
-import { ShieldAlert, AlertTriangle, CheckCheck, Clock, MapPin, CheckCircle2, Flame, Thermometer, CloudFog } from 'lucide-react';
+import { FloodAlert } from '../types/flood';
+import { ShieldAlert, AlertTriangle, CheckCheck, Clock, MapPin, CheckCircle2 } from 'lucide-react';
 
 interface AlertNotificationProps {
-  alert: FireAlert;
+  alert: FloodAlert;
   onAcknowledge?: (alertId: string) => void;
 }
 
@@ -42,9 +42,10 @@ export const AlertNotification: React.FC<AlertNotificationProps> = ({ alert, onA
   const sev = SEVERITY_CONFIG[alert.severity] || SEVERITY_CONFIG.LOW;
   const isAck = alert.status === 'ACKNOWLEDGED' || alert.status === 'RESOLVED';
 
-  const formatTime = (timeStr?: string) => {
-    if (!timeStr) return 'Just now';
-    return timeStr;
+  const formatTime = (isoString?: string) => {
+    if (!isoString) return 'Just now';
+    const d = new Date(isoString);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   };
 
   return (
@@ -66,8 +67,6 @@ export const AlertNotification: React.FC<AlertNotificationProps> = ({ alert, onA
           style={{ background: `${sev.color}22`, border: `1px solid ${sev.color}44` }}
         >
           {alert.severity === 'CRITICAL' ? (
-            <Flame size={20} color={sev.color} />
-          ) : alert.severity === 'HIGH' ? (
             <ShieldAlert size={18} color={sev.color} />
           ) : (
             <AlertTriangle size={18} color={sev.color} />
@@ -101,28 +100,14 @@ export const AlertNotification: React.FC<AlertNotificationProps> = ({ alert, onA
 
           {/* Location & Metadata */}
           <div className="flex flex-wrap items-center gap-4 mt-2.5 pt-2 border-t border-white/5 text-xs text-slate-300">
-            <div className="flex items-center gap-1.5 text-orange-300 font-medium">
-              <MapPin size={13} className="text-orange-400" />
+            <div className="flex items-center gap-1.5 text-cyan-300 font-medium">
+              <MapPin size={13} className="text-cyan-400" />
               <span>Location: <strong>{alert.location}</strong></span>
             </div>
 
-            {alert.temperature !== undefined && (
-              <span className="text-slate-300 text-[11px] flex items-center gap-1">
-                <Thermometer size={12} className="text-orange-400" />
-                <span>Temp: <strong className="text-orange-300 font-mono">{alert.temperature.toFixed(1)}°C</strong></span>
-              </span>
-            )}
-
-            {alert.smokePPM !== undefined && (
-              <span className="text-slate-300 text-[11px] flex items-center gap-1">
-                <CloudFog size={12} className="text-amber-400" />
-                <span>Smoke: <strong className="text-amber-300 font-mono">{alert.smokePPM} ppm</strong></span>
-              </span>
-            )}
-
-            {alert.confidenceScore !== undefined && (
+            {alert.confidenceScore && (
               <span className="text-slate-400 text-[11px]">
-                Confidence: <strong className="text-emerald-400 font-mono">{alert.confidenceScore}%</strong>
+                Inference Confidence: <strong className="text-emerald-400 font-mono">{(alert.confidenceScore * 100).toFixed(0)}%</strong>
               </span>
             )}
           </div>
@@ -134,20 +119,16 @@ export const AlertNotification: React.FC<AlertNotificationProps> = ({ alert, onA
         {!isAck && onAcknowledge ? (
           <button
             onClick={() => onAcknowledge(alert.id)}
-            className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-white/10 hover:bg-white/20 text-white border border-white/20 transition-all flex items-center gap-1.5 shadow-sm"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-emerald-300 bg-emerald-950/70 border border-emerald-500/40 hover:bg-emerald-900/80 active:scale-95 transition-all shadow-sm"
           >
-            <CheckCheck size={14} className="text-cyan-400" />
-            <span>Acknowledge</span>
+            <CheckCheck size={14} /> ACKNOWLEDGE ALERT
           </button>
         ) : (
-          <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-semibold px-3 py-1 bg-emerald-950/60 border border-emerald-500/30 rounded-lg">
-            <CheckCircle2 size={14} />
-            <span>Dispatched</span>
-          </div>
+          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/30">
+            <CheckCircle2 size={14} /> ACKNOWLEDGED
+          </span>
         )}
       </div>
     </div>
   );
 };
-
-export default AlertNotification;

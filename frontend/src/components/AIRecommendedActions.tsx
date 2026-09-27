@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { AIFireRecommendation, FireRiskTier } from '../types/fire';
+import { AIRecommendedAction, FloodRiskTier } from '../types/flood';
 import {
   ShieldAlert,
   AlertOctagon,
-  Flame,
+  LifeBuoy,
   PhoneCall,
   Truck,
   Users,
@@ -12,16 +12,12 @@ import {
   Sparkles,
   Layers,
   ArrowRight,
-  ShieldCheck,
-  Footprints,
-  Scan,
-  Droplets,
-  BellRing
+  ShieldCheck
 } from 'lucide-react';
 
 interface AIRecommendedActionsProps {
-  actions: AIFireRecommendation[];
-  riskTier: FireRiskTier;
+  actions: AIRecommendedAction[];
+  riskTier: FloodRiskTier;
   onExecuteAction?: (actionId: string) => void;
 }
 
@@ -30,7 +26,7 @@ export const AIRecommendedActions: React.FC<AIRecommendedActionsProps> = ({
   riskTier,
   onExecuteAction
 }) => {
-  const [actionsList, setActionsList] = useState<AIFireRecommendation[]>(initialActions);
+  const [actionsList, setActionsList] = useState<AIRecommendedAction[]>(initialActions);
   const [dispatchedId, setDispatchedId] = useState<string | null>(null);
 
   React.useEffect(() => {
@@ -45,10 +41,10 @@ export const AIRecommendedActions: React.FC<AIRecommendedActionsProps> = ({
       );
       setDispatchedId(null);
       if (onExecuteAction) onExecuteAction(id);
-    }, 400);
+    }, 500);
   };
 
-  const getPriorityStyle = (priority: AIFireRecommendation['priority']) => {
+  const getPriorityStyle = (priority: AIRecommendedAction['priority']) => {
     switch (priority) {
       case 'CRITICAL_NOW':
         return {
@@ -77,22 +73,20 @@ export const AIRecommendedActions: React.FC<AIRecommendedActionsProps> = ({
     }
   };
 
-  const getCategoryIcon = (category: AIFireRecommendation['category']) => {
+  const getCategoryIcon = (category: AIRecommendedAction['category']) => {
     switch (category) {
-      case 'Suppression':
-        return <Flame size={18} className="text-red-400" />;
       case 'Evacuation':
-        return <Users size={18} className="text-orange-400" />;
-      case 'Authorities':
-        return <BellRing size={18} className="text-amber-400" />;
-      case 'Patrol':
-        return <Footprints size={18} className="text-yellow-400" />;
-      case 'Firebreaks':
+        return <Users size={18} className="text-red-400" />;
+      case 'Infrastructure':
+        return <AlertOctagon size={18} className="text-amber-400" />;
+      case 'Authority':
+        return <PhoneCall size={18} className="text-cyan-400" />;
+      case 'Livestock':
+        return <Truck size={18} className="text-yellow-400" />;
+      case 'Barriers':
         return <Layers size={18} className="text-emerald-400" />;
-      case 'Surveillance':
-        return <Scan size={18} className="text-cyan-400" />;
       default:
-        return <ShieldCheck size={18} className="text-cyan-400" />;
+        return <LifeBuoy size={18} className="text-cyan-400" />;
     }
   };
 
@@ -101,103 +95,107 @@ export const AIRecommendedActions: React.FC<AIRecommendedActionsProps> = ({
       className="field-panel p-6 rounded-xl flex flex-col justify-between"
       style={{
         background: 'linear-gradient(160deg, rgba(15,23,42,0.95) 0%, rgba(10,15,26,0.98) 100%)',
-        border: '1px solid rgba(249,115,22,0.3)',
+        border: '1px solid rgba(56,189,248,0.25)',
         boxShadow: '0 8px 24px rgba(0,0,0,0.35)'
       }}
     >
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-5 pb-3 border-b border-white/10">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6 pb-4 border-b border-white/10">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-orange-950/70 border border-orange-500/40 flex items-center justify-center text-orange-400">
+          <div className="w-10 h-10 rounded-lg bg-orange-950/60 border border-orange-500/40 flex items-center justify-center text-orange-400">
             <Sparkles size={22} />
           </div>
           <div>
             <div className="text-[11px] font-bold uppercase tracking-wider text-orange-400">
-              SECTION 8 · AUTONOMOUS WILDFIRE INCIDENT PROTOCOLS
+              SECTION 8 · AUTONOMOUS EMERGENCY DISASTER PROTOCOLS
             </div>
             <h2 className="text-xl font-bold text-white tracking-tight">
-              AI Recommended Tactical Actions
+              AI Recommended Tactical Actions ({riskTier} Phase)
             </h2>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-400 font-medium">Triggered by:</span>
-          <span className="px-3 py-1 rounded-full text-xs font-bold bg-orange-500/20 text-orange-300 border border-orange-500/40">
-            {riskTier} FIRE RISK PROTOCOL
+          <span className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-900 border border-white/10 text-slate-300">
+            {actionsList.filter(a => a.status === 'DISPATCHED').length} of {actionsList.length} Protocols Dispatched
           </span>
+          <button
+            onClick={() => setActionsList(prev => prev.map(a => ({ ...a, status: 'DISPATCHED' })))}
+            className="text-xs font-bold text-cyan-300 bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500/40 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5"
+          >
+            <Send size={13} /> Dispatch All Protocols
+          </button>
         </div>
       </div>
 
-      {/* Grid of Action Cards */}
+      {/* Grid of Action Cards across full width */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {actionsList.map(action => {
-          const prio = getPriorityStyle(action.priority);
-          const isDispatched = action.status === 'DISPATCHED' || action.status === 'COMPLETED';
-          const isPending = dispatchedId === action.id;
+        {actionsList.map((action) => {
+          const style = getPriorityStyle(action.priority);
+          const isDone = action.status === 'DISPATCHED' || action.status === 'COMPLETED';
+          const isProcessing = dispatchedId === action.id;
 
           return (
             <div
               key={action.id}
-              className={`p-4 rounded-xl bg-slate-900/70 border border-white/10 transition-all flex flex-col justify-between ${prio.border} ${
-                isDispatched ? 'opacity-80' : 'hover:border-white/25 hover:bg-slate-800/60'
-              }`}
+              className={`p-4 rounded-xl bg-slate-900/70 border border-white/10 transition-all ${style.border} flex flex-col justify-between hover:border-white/20`}
             >
               <div>
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="p-1.5 rounded-lg bg-white/5 border border-white/10">
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-lg bg-slate-950 border border-white/10">
                       {getCategoryIcon(action.category)}
                     </div>
-                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
-                      {action.category}
-                    </span>
+                    <div>
+                      <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${style.badge}`}>
+                        {style.label}
+                      </span>
+                      <span className="text-[11px] text-slate-400 font-semibold ml-2">
+                        {action.category} Protocol
+                      </span>
+                    </div>
                   </div>
 
-                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${prio.badge}`}>
-                    {prio.label}
-                  </span>
+                  {isDone ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold text-emerald-400 bg-emerald-500/15 border border-emerald-500/30">
+                      <CheckCircle2 size={13} /> EXECUTED
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => handleActionClick(action.id)}
+                      disabled={isProcessing}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 active:scale-95 border border-cyan-400/40 transition-all shadow-sm"
+                    >
+                      {isProcessing ? 'SENDING...' : <><Send size={12} /> EXECUTE</>}
+                    </button>
+                  )}
                 </div>
 
-                <h4 className="text-sm font-bold text-white mb-1.5 leading-snug">
+                <h3 className="text-sm font-bold text-white leading-snug mt-1">
                   {action.title}
-                </h4>
-                <p className="text-xs text-slate-300 leading-relaxed mb-4">
+                </h3>
+                <p className="text-xs text-slate-300 mt-1 leading-relaxed">
                   {action.description}
                 </p>
               </div>
 
-              <div className="pt-3 border-t border-white/10 flex items-center justify-between">
-                <span className="text-[11px] text-slate-400 font-mono">
-                  ACTION ID: <strong>{action.id}</strong>
-                </span>
-
-                {isDispatched ? (
-                  <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-400 bg-emerald-950/60 px-3 py-1 rounded-lg border border-emerald-500/40">
-                    <CheckCircle2 size={13} />
-                    <span>Dispatched to Field</span>
-                  </span>
-                ) : (
-                  <button
-                    onClick={() => handleActionClick(action.id)}
-                    disabled={isPending}
-                    className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-orange-600 hover:bg-orange-500 text-white transition-all flex items-center gap-1.5 shadow-md shadow-orange-950/50"
-                  >
-                    {isPending ? (
-                      <span className="animate-spin text-xs">●</span>
-                    ) : (
-                      <Send size={13} />
-                    )}
-                    <span>Authorize Dispatch</span>
-                  </button>
-                )}
+              <div className="mt-3 pt-2.5 border-t border-white/5 flex items-center justify-between text-[11px] text-slate-400">
+                <span>Protocol ID: <strong className="text-slate-300 font-mono">{action.id}</strong></span>
+                <span className="text-cyan-400 font-medium">CAP XML & SMS Automated</span>
               </div>
             </div>
           );
         })}
       </div>
+
+      {/* Footer Banner */}
+      <div className="mt-4 pt-3 border-t border-white/10 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
+        <span className="flex items-center gap-1.5">
+          <ShieldAlert size={14} className="text-orange-400" />
+          Synchronized with District Disaster Management Authority (DDMA) & National Disaster Response Force (NDRF)
+        </span>
+        <span className="text-slate-400">Target Zone: Brahmaputra River Basin & Assam Floodplains</span>
+      </div>
     </div>
   );
 };
-
-export default AIRecommendedActions;

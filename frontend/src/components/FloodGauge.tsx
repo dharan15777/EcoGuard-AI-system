@@ -1,26 +1,22 @@
 import React from 'react';
-import { FireRiskTier } from '../types/fire';
-import { FIRE_RISK_COLORS } from '../utils/fireConstants';
-import { AlertTriangle, ShieldCheck, ShieldAlert, TrendingUp, Info, Flame, Wind, Droplets } from 'lucide-react';
+import { FloodRiskTier } from '../types/flood';
+import { RISK_COLORS } from '../utils/floodConstants';
+import { AlertTriangle, ShieldCheck, ShieldAlert, TrendingUp, Info, Activity } from 'lucide-react';
 
-interface FireGaugeProps {
+interface FloodGaugeProps {
   score: number; // 0 to 100
-  tier: FireRiskTier;
-  temperature: number; // °C
-  humidity: number; // %
-  smokePPM: number; // ppm
-  windSpeed: number; // km/h
+  tier: FloodRiskTier;
+  waterLevel: number;
+  rateOfRise?: number; // m/hr
 }
 
-export const FireGauge: React.FC<FireGaugeProps> = ({
+export const FloodGauge: React.FC<FloodGaugeProps> = ({
   score,
   tier,
-  temperature,
-  humidity,
-  smokePPM,
-  windSpeed
+  waterLevel,
+  rateOfRise = 0.34
 }) => {
-  const currentRisk = FIRE_RISK_COLORS[tier] || FIRE_RISK_COLORS.LOW;
+  const currentRisk = RISK_COLORS[tier] || RISK_COLORS.SAFE;
 
   // Arc geometry
   const radius = 135;
@@ -52,8 +48,8 @@ export const FireGauge: React.FC<FireGaugeProps> = ({
       className="field-panel p-6 rounded-xl relative overflow-hidden"
       style={{
         background: 'linear-gradient(160deg, rgba(15,23,42,0.95) 0%, rgba(10,15,26,0.98) 100%)',
-        border: tier === 'EXTREME' ? '1px solid rgba(239, 68, 68, 0.45)' : '1px solid rgba(255,255,255,0.1)',
-        boxShadow: tier === 'EXTREME' ? '0 10px 30px rgba(239, 68, 68, 0.15)' : '0 8px 24px rgba(0,0,0,0.35)'
+        border: tier === 'DANGER' ? '1px solid rgba(239, 68, 68, 0.45)' : '1px solid rgba(255,255,255,0.1)',
+        boxShadow: tier === 'DANGER' ? '0 10px 30px rgba(239, 68, 68, 0.15)' : '0 8px 24px rgba(0,0,0,0.35)'
       }}
     >
       {/* Section Header */}
@@ -63,16 +59,16 @@ export const FireGauge: React.FC<FireGaugeProps> = ({
             className="w-10 h-10 rounded-lg flex items-center justify-center shadow-md"
             style={{ background: currentRisk.bg, border: `1px solid ${currentRisk.border}` }}
           >
-            <Flame size={22} color={currentRisk.color} />
+            <Activity size={22} color={currentRisk.color} />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <span className="text-[11px] font-bold uppercase tracking-wider text-cyan-400">
-                SECTION 2 · COMPREHENSIVE FOREST FIRE RISK ASSESSMENT
+                SECTION 2 · COMPREHENSIVE FLOOD RISK ASSESSMENT
               </span>
             </div>
             <h2 className="text-xl font-bold text-white tracking-tight">
-              Fire Risk Severity Indicator & Visual Gauge
+              Flood Risk Severity Indicator & Visual Gauge
             </h2>
           </div>
         </div>
@@ -86,14 +82,8 @@ export const FireGauge: React.FC<FireGaugeProps> = ({
             border: `1.5px solid ${currentRisk.border}`
           }}
         >
-          {tier === 'EXTREME' ? (
-            <ShieldAlert size={16} />
-          ) : tier === 'LOW' ? (
-            <ShieldCheck size={16} />
-          ) : (
-            <AlertTriangle size={16} />
-          )}
-          STATUS: {currentRisk.name.toUpperCase()} RISK CATEGORY
+          {tier === 'DANGER' ? <ShieldAlert size={16} /> : tier === 'SAFE' ? <ShieldCheck size={16} /> : <AlertTriangle size={16} />}
+          STATUS: {currentRisk.name.toUpperCase()} RISK TIER
         </div>
       </div>
 
@@ -103,7 +93,7 @@ export const FireGauge: React.FC<FireGaugeProps> = ({
         <div className="lg:col-span-6 flex flex-col items-center justify-center p-4 bg-slate-900/60 rounded-xl border border-white/5 relative">
           <svg viewBox="0 0 400 230" className="w-full max-w-[420px] h-auto overflow-visible select-none">
             <defs>
-              <filter id="gauge-glow-fire" x="-20%" y="-20%" width="140%" height="140%">
+              <filter id="gauge-glow-v2" x="-20%" y="-20%" width="140%" height="140%">
                 <feGaussianBlur stdDeviation="5" result="blur" />
                 <feComposite in="SourceGraphic" in2="blur" operator="over" />
               </filter>
@@ -119,40 +109,40 @@ export const FireGauge: React.FC<FireGaugeProps> = ({
             />
 
             {/* 4 Color Zones */}
-            {/* Green = Low (0 - 25) */}
+            {/* Green = Safe (0 - 25) */}
             <path
               d={createArc(0.01, 0.245)}
               fill="none"
               stroke="#10b981"
               strokeWidth={strokeWidth}
-              opacity={tier === 'LOW' ? 1 : 0.4}
+              opacity={tier === 'SAFE' ? 1 : 0.4}
               strokeLinecap="round"
             />
-            {/* Yellow = Moderate (25 - 50) */}
+            {/* Yellow = Watch (25 - 50) */}
             <path
               d={createArc(0.26, 0.495)}
               fill="none"
               stroke="#f59e0b"
               strokeWidth={strokeWidth}
-              opacity={tier === 'MODERATE' ? 1 : 0.4}
+              opacity={tier === 'WATCH' ? 1 : 0.4}
             />
-            {/* Orange = High (50 - 75) */}
+            {/* Orange = Warning (50 - 75) */}
             <path
               d={createArc(0.51, 0.745)}
               fill="none"
               stroke="#f97316"
               strokeWidth={strokeWidth}
-              opacity={tier === 'HIGH' ? 1 : 0.4}
+              opacity={tier === 'WARNING' ? 1 : 0.4}
             />
-            {/* Red = Extreme (75 - 100) */}
+            {/* Red = Danger (75 - 100) */}
             <path
               d={createArc(0.76, 0.99)}
               fill="none"
               stroke="#ef4444"
               strokeWidth={strokeWidth}
-              opacity={tier === 'EXTREME' ? 1 : 0.4}
+              opacity={tier === 'DANGER' ? 1 : 0.4}
               strokeLinecap="round"
-              filter={tier === 'EXTREME' ? 'url(#gauge-glow-fire)' : undefined}
+              filter={tier === 'DANGER' ? 'url(#gauge-glow-v2)' : undefined}
             />
 
             {/* Scale Numerics */}
@@ -171,7 +161,7 @@ export const FireGauge: React.FC<FireGaugeProps> = ({
               stroke={currentRisk.color}
               strokeWidth="4"
               strokeLinecap="round"
-              filter="url(#gauge-glow-fire)"
+              filter="url(#gauge-glow-v2)"
             />
             <line
               x1={cx}
@@ -197,89 +187,60 @@ export const FireGauge: React.FC<FireGaugeProps> = ({
               <span className="text-slate-400 font-bold text-lg">/ 100</span>
             </div>
             <div className="text-xs uppercase font-bold tracking-wider text-slate-300 mt-1">
-              Wildfire Risk Severity Index
+              Flood Severity Index
             </div>
           </div>
         </div>
 
-        {/* Right: Risk Category Matrix & Environmental Telemetry Breakdown (6 cols) */}
+        {/* Right: Risk Threshold Matrix & Telemetry Breakdown (6 cols) */}
         <div className="lg:col-span-6 flex flex-col justify-between gap-4">
           {/* Telemetry Stats */}
           <div className="grid grid-cols-2 gap-3">
             <div className="p-3.5 rounded-xl bg-slate-900/80 border border-white/10">
-              <span className="text-xs text-slate-400 font-medium">Canopy Temperature</span>
-              <div className="text-xl font-bold text-orange-400 flex items-center gap-1.5 mt-1">
-                <TrendingUp size={18} /> {temperature.toFixed(1)}°C
+              <span className="text-xs text-slate-400 font-medium">Telemetry Rate of Rise</span>
+              <div className="text-xl font-bold text-cyan-400 flex items-center gap-1.5 mt-1">
+                <TrendingUp size={18} /> +{rateOfRise.toFixed(2)} m/hr
               </div>
-              <span className="text-[11px] text-slate-400 mt-0.5 block">
-                {temperature >= 40 ? 'Extreme Thermal Danger' : 'Daytime heating curve'}
-              </span>
+              <span className="text-[11px] text-slate-400 mt-0.5 block">Rapid catchment inflow</span>
             </div>
 
             <div className="p-3.5 rounded-xl bg-slate-900/80 border border-white/10">
-              <span className="text-xs text-slate-400 font-medium">Relative Humidity & Wind</span>
-              <div className="text-xl font-bold text-white mt-1 flex items-center gap-2">
-                <span>{humidity}%</span>
-                <span className="text-xs text-cyan-400 font-mono">({windSpeed} km/h)</span>
+              <span className="text-xs text-slate-400 font-medium">Current River Stage</span>
+              <div className="text-xl font-bold text-white mt-1">
+                {waterLevel.toFixed(2)} meters
               </div>
-              <span className={`text-[11px] mt-0.5 block font-semibold ${humidity <= 25 ? 'text-red-400' : 'text-slate-400'}`}>
-                {humidity <= 25 ? 'Critical Desiccation (< 25%)' : 'Stable moisture reserve'}
-              </span>
+              <span className="text-[11px] text-red-400 mt-0.5 block font-semibold">Exceeds Danger Limit (4.20m)</span>
             </div>
           </div>
 
           {/* Color-Coded Risk Level Definitions */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            <div
-              className={`p-3 rounded-lg border text-center transition-all ${
-                tier === 'LOW'
-                  ? 'bg-emerald-500/20 border-emerald-500 ring-2 ring-emerald-500/40'
-                  : 'bg-slate-900/50 border-white/10'
-              }`}
-            >
+            <div className={`p-3 rounded-lg border text-center transition-all ${tier === 'SAFE' ? 'bg-emerald-500/20 border-emerald-500 ring-2 ring-emerald-500/40' : 'bg-slate-900/50 border-white/10'}`}>
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block mb-1" />
-              <div className="text-xs font-bold text-emerald-400">LOW</div>
+              <div className="text-xs font-bold text-emerald-400">SAFE</div>
               <div className="text-[11px] text-slate-400 font-mono">0 – 25</div>
-              <div className="text-[10px] text-slate-400 mt-1">Safe canopy</div>
+              <div className="text-[10px] text-slate-400 mt-1">Nominal flow</div>
             </div>
 
-            <div
-              className={`p-3 rounded-lg border text-center transition-all ${
-                tier === 'MODERATE'
-                  ? 'bg-amber-500/20 border-amber-500 ring-2 ring-amber-500/40'
-                  : 'bg-slate-900/50 border-white/10'
-              }`}
-            >
+            <div className={`p-3 rounded-lg border text-center transition-all ${tier === 'WATCH' ? 'bg-amber-500/20 border-amber-500 ring-2 ring-amber-500/40' : 'bg-slate-900/50 border-white/10'}`}>
               <span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block mb-1" />
-              <div className="text-xs font-bold text-amber-400">MODERATE</div>
+              <div className="text-xs font-bold text-amber-400">WATCH</div>
               <div className="text-[11px] text-slate-400 font-mono">26 – 50</div>
-              <div className="text-[10px] text-slate-400 mt-1">Heightened dry</div>
+              <div className="text-[10px] text-slate-400 mt-1">Rising levels</div>
             </div>
 
-            <div
-              className={`p-3 rounded-lg border text-center transition-all ${
-                tier === 'HIGH'
-                  ? 'bg-orange-500/20 border-orange-500 ring-2 ring-orange-500/40'
-                  : 'bg-slate-900/50 border-white/10'
-              }`}
-            >
+            <div className={`p-3 rounded-lg border text-center transition-all ${tier === 'WARNING' ? 'bg-orange-500/20 border-orange-500 ring-2 ring-orange-500/40' : 'bg-slate-900/50 border-white/10'}`}>
               <span className="w-2.5 h-2.5 rounded-full bg-orange-400 inline-block mb-1" />
-              <div className="text-xs font-bold text-orange-400">HIGH</div>
+              <div className="text-xs font-bold text-orange-400">WARNING</div>
               <div className="text-[11px] text-slate-400 font-mono">51 – 75</div>
-              <div className="text-[10px] text-slate-400 mt-1">High ignition</div>
+              <div className="text-[10px] text-slate-400 mt-1">Overbank risk</div>
             </div>
 
-            <div
-              className={`p-3 rounded-lg border text-center transition-all ${
-                tier === 'EXTREME'
-                  ? 'bg-red-500/20 border-red-500 ring-2 ring-red-500/40'
-                  : 'bg-slate-900/50 border-white/10'
-              }`}
-            >
+            <div className={`p-3 rounded-lg border text-center transition-all ${tier === 'DANGER' ? 'bg-red-500/20 border-red-500 ring-2 ring-red-500/40' : 'bg-slate-900/50 border-white/10'}`}>
               <span className="w-2.5 h-2.5 rounded-full bg-red-400 animate-pulse inline-block mb-1" />
-              <div className="text-xs font-bold text-red-400">EXTREME</div>
+              <div className="text-xs font-bold text-red-400">DANGER</div>
               <div className="text-[11px] text-slate-400 font-mono">76 – 100</div>
-              <div className="text-[10px] text-slate-400 mt-1">Active wildfire</div>
+              <div className="text-[10px] text-slate-400 mt-1">Severe inundation</div>
             </div>
           </div>
 
@@ -287,14 +248,7 @@ export const FireGauge: React.FC<FireGaugeProps> = ({
           <div className="p-3.5 rounded-xl bg-slate-900/80 border border-white/10 flex items-start gap-3">
             <Info size={18} className="text-cyan-400 flex-shrink-0 mt-0.5" />
             <div className="text-xs text-slate-300 leading-relaxed">
-              <strong>Active Environmental Assessment:</strong> Thermal sensors record <strong>{temperature.toFixed(1)}°C</strong> with humidity at <strong>{humidity}%</strong> and smoke concentration at <strong>{smokePPM} ppm</strong>. Risk score is evaluated at <strong>{score}/100</strong> ({tier} RISK). Tactical protocols prescribe{' '}
-              {tier === 'EXTREME'
-                ? 'immediate aerial/ground suppression and community evacuation preparedness.'
-                : tier === 'HIGH'
-                ? 'full mobilization of forest response teams and firebreak widening.'
-                : tier === 'MODERATE'
-                ? 'increased ranger patrols and thermal drone sweeps.'
-                : 'continuous 24/7 autonomous monitoring.'}
+              <strong>Active Emergency Threshold:</strong> Hydrostatic stage sensor reports water level at <strong>{waterLevel.toFixed(2)}m</strong> with a flood risk score of <strong>{score}/100</strong>. Disaster management protocols recommend immediate Phase-2 mitigation and barrier deployment.
             </div>
           </div>
         </div>
@@ -302,7 +256,3 @@ export const FireGauge: React.FC<FireGaugeProps> = ({
     </div>
   );
 };
-
-// Aliases for compatibility
-export const FloodGauge = FireGauge;
-export default FireGauge;
