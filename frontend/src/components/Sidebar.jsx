@@ -1,10 +1,11 @@
 import React from 'react';
-import { LayoutDashboard, Cpu, AlertTriangle, BarChart3, Home, User, LogIn, Leaf, Waves, Flame } from 'lucide-react';
+import { LayoutDashboard, Cpu, AlertTriangle, BarChart3, Home, User, LogIn, Leaf, Waves, Flame, Mountain } from 'lucide-react';
 
 const navItems = [
   { id: 'home',      icon: Home,            label: 'Overview' },
   { id: 'flood',     icon: Waves,           label: 'Flood Detection Monitoring' },
   { id: 'fire',      icon: Flame,           label: 'Forest Fire Detection Monitoring' },
+  { id: 'landslide', icon: Mountain,        label: 'Landslide Detection Monitoring' },
   { id: 'sensors',   icon: Cpu,             label: 'Field Nodes' },
   { id: 'alerts',    icon: AlertTriangle,   label: 'Active Alerts' },
   { id: 'analytics', icon: BarChart3,       label: 'Trend Analysis' },
@@ -32,16 +33,28 @@ export const Sidebar = ({ activePage, setActivePage }) => {
           ? (activePage === 'flood' || activePage === 'dashboard')
           : activePage === item.id;
 
-        const activeColor = item.id === 'fire' ? '#fb923c' : item.id === 'flood' ? '#38bdf8' : '#82b460';
+        const activeColor = item.id === 'fire'
+          ? '#fb923c'
+          : item.id === 'flood'
+          ? '#38bdf8'
+          : item.id === 'landslide'
+          ? '#fbbf24'
+          : '#82b460';
+
         const activeBg = item.id === 'fire'
           ? 'rgba(249,115,22,0.18)'
           : item.id === 'flood'
           ? 'rgba(56,189,248,0.18)'
+          : item.id === 'landslide'
+          ? 'rgba(245,158,11,0.18)'
           : 'rgba(90,138,74,0.15)';
+
         const activeBorder = item.id === 'fire'
           ? '1px solid rgba(249,115,22,0.45)'
           : item.id === 'flood'
           ? '1px solid rgba(56,189,248,0.45)'
+          : item.id === 'landslide'
+          ? '1px solid rgba(245,158,11,0.45)'
           : '1px solid rgba(90,138,74,0.35)';
 
         return (

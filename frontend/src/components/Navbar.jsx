@@ -52,7 +52,11 @@ export const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-muted)', letterSpacing: '0.1em' }}>ZONE</div>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.9rem', fontWeight: '700', color: '#c4d4bc' }}>
-            {activePage === 'fire' ? 'BANDIPUR - WESTERN GHATS RESERVE' : 'ASSAM - BRAHMAPUTRA BASIN'}
+            {activePage === 'landslide'
+              ? 'WAYANAD HILL SLOPES - WESTERN GHATS'
+              : activePage === 'fire'
+              ? 'BANDIPUR - WESTERN GHATS RESERVE'
+              : 'ASSAM - BRAHMAPUTRA BASIN'}
           </div>
         </div>
 

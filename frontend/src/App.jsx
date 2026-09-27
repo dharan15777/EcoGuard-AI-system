@@ -78,6 +78,15 @@ export function App() {
             onAcknowledgeAlert={acknowledgeAlert}
           />
         );
+      case 'landslide':
+        return (
+          <DashboardPage
+            mode="landslide"
+            sensors={sensors}
+            alerts={alerts}
+            onAcknowledgeAlert={acknowledgeAlert}
+          />
+        );
       case 'sensors':
         return <SensorManagement sensors={sensors} />;
       case 'alerts':
