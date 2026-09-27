@@ -1,12 +1,12 @@
 import React from 'react';
-import { FloodSensor } from '../types/flood';
-import { RISK_COLORS } from '../utils/floodConstants';
-import { Waves, CloudRain, Battery, Radio, Clock, ShieldAlert, Cpu } from 'lucide-react';
+import { FireSensor } from '../types/fire';
+import { FIRE_RISK_COLORS } from '../utils/fireConstants';
+import { Thermometer, CloudFog, Wind, Droplets, Battery, Radio, Clock, Flame, ShieldAlert, Cpu } from 'lucide-react';
 
 interface SensorCardProps {
-  sensor: FloodSensor;
+  sensor: FireSensor;
   isSelected?: boolean;
-  onSelect?: (sensor: FloodSensor) => void;
+  onSelect?: (sensor: FireSensor) => void;
 }
 
 export const SensorCard: React.FC<SensorCardProps> = ({
@@ -14,7 +14,7 @@ export const SensorCard: React.FC<SensorCardProps> = ({
   isSelected = false,
   onSelect
 }) => {
-  const riskMeta = RISK_COLORS[sensor.riskTier] || RISK_COLORS.SAFE;
+  const riskMeta = FIRE_RISK_COLORS[sensor.riskTier] || FIRE_RISK_COLORS.LOW;
   const isOnline = sensor.status === 'ONLINE';
 
   const formatLastPing = (isoString?: string) => {
@@ -34,7 +34,7 @@ export const SensorCard: React.FC<SensorCardProps> = ({
       onClick={() => onSelect && onSelect(sensor)}
       className={`p-4 rounded-xl cursor-pointer transition-all duration-200 border flex flex-col justify-between ${
         isSelected
-          ? 'bg-slate-800/95 border-cyan-400 shadow-xl ring-2 ring-cyan-400/40'
+          ? 'bg-slate-800/95 border-orange-400 shadow-xl ring-2 ring-orange-400/40'
           : 'bg-slate-900/70 border-white/10 hover:border-white/20 hover:bg-slate-800/70'
       }`}
     >
@@ -59,9 +59,9 @@ export const SensorCard: React.FC<SensorCardProps> = ({
                 {sensor.name}
               </h4>
               <div className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
-                <span className="text-cyan-400 font-mono font-bold">{sensor.id}</span>
+                <span className="text-orange-400 font-mono font-bold">{sensor.id}</span>
                 <span>·</span>
-                <span>{sensor.basin}</span>
+                <span>{sensor.forestZone}</span>
               </div>
             </div>
           </div>
@@ -78,66 +78,66 @@ export const SensorCard: React.FC<SensorCardProps> = ({
           </span>
         </div>
 
-        {/* Telemetry Metrics Row: Water Level & Rainfall */}
+        {/* Telemetry Metrics Row: Temperature & Smoke */}
         <div className="grid grid-cols-2 gap-2.5 my-3 p-2.5 rounded-lg bg-slate-950/70 border border-white/5">
           <div>
             <div className="text-[10px] text-slate-400 flex items-center gap-1 font-semibold uppercase">
-              <Waves size={12} className="text-cyan-400" /> Stage Height
+              <Thermometer size={12} className="text-orange-400" /> Temperature
             </div>
-            <div className="text-lg font-bold text-cyan-300 font-mono mt-0.5">
-              {sensor.waterLevel.toFixed(2)}m
-              <span className="text-xs text-slate-500 font-normal ml-1">
-                / {sensor.floodThreshold.toFixed(2)}m
+            <div className="text-lg font-bold text-orange-300 font-mono mt-0.5">
+              {sensor.temperature.toFixed(1)}°C
+              <span className="text-[10px] text-slate-400 font-normal ml-1">
+                (Max: {sensor.maxTempToday.toFixed(1)}°)
               </span>
             </div>
           </div>
 
           <div>
             <div className="text-[10px] text-slate-400 flex items-center gap-1 font-semibold uppercase">
-              <CloudRain size={12} className="text-indigo-400" /> Precipitation
+              <CloudFog size={12} className="text-amber-400" /> Smoke & CO
             </div>
-            <div className="text-lg font-bold text-indigo-300 font-mono mt-0.5">
-              {sensor.rainfallRate.toFixed(1)} <span className="text-xs font-sans">mm/h</span>
+            <div className="text-lg font-bold text-amber-300 font-mono mt-0.5">
+              {sensor.smokePPM} <span className="text-xs font-sans">ppm</span>
+              <span className="text-[10px] text-slate-400 font-normal ml-1">
+                (CO: {sensor.carbonMonoxide.toFixed(1)})
+              </span>
             </div>
           </div>
         </div>
 
-        {/* Risk Score Progress Bar */}
-        <div className="mb-3">
-          <div className="flex justify-between text-xs text-slate-400 mb-1">
-            <span>Flood Risk Score</span>
-            <span style={{ color: riskMeta.color }} className="font-bold font-mono">
-              {sensor.riskScore} / 100
-            </span>
+        {/* Atmospheric Context: Humidity & Wind */}
+        <div className="flex items-center justify-between text-xs text-slate-300 mb-3 px-1">
+          <div className="flex items-center gap-1.5">
+            <Droplets size={12} className="text-cyan-400" />
+            <span>Humidity: <strong className={sensor.humidity <= 25 ? 'text-red-400' : 'text-white'}>{sensor.humidity}%</strong></span>
           </div>
-          <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{
-                width: `${sensor.riskScore}%`,
-                background: riskMeta.color
-              }}
-            />
+          <div className="flex items-center gap-1.5">
+            <Wind size={12} className="text-amber-400" />
+            <span>Wind: <strong className="text-white">{sensor.windSpeed} km/h</strong></span>
           </div>
         </div>
       </div>
 
-      {/* Footer: 1. Sensor Name, 2. Online/Offline Status, 3. Battery Percentage, 4. Last Update Time */}
-      <div className="pt-2.5 border-t border-white/10 flex items-center justify-between text-xs text-slate-400">
-        <span className={`font-semibold ${isOnline ? 'text-emerald-400' : 'text-slate-500'}`}>
-          ● {sensor.status}
+      {/* Footer: Battery, Signal, Timestamp */}
+      <div className="pt-2.5 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-400">
+        <div className="flex items-center gap-3">
+          <span className="flex items-center gap-1">
+            <Battery size={13} className={getBatteryColor(sensor.batteryLevel)} />
+            <strong className="text-slate-200 font-mono">{sensor.batteryLevel.toFixed(0)}%</strong>
+          </span>
+          <span className="flex items-center gap-1">
+            <Radio size={13} className="text-cyan-400" />
+            <span>LoRaWAN</span>
+          </span>
+        </div>
+
+        <span className="flex items-center gap-1 font-mono text-[10px]">
+          <Clock size={11} className="text-slate-500" />
+          {formatLastPing(sensor.lastPing)}
         </span>
-
-        <div className="flex items-center gap-1">
-          <Battery size={14} className={getBatteryColor(sensor.batteryLevel)} />
-          <span className="font-bold text-slate-200 font-mono">{sensor.batteryLevel.toFixed(0)}%</span>
-        </div>
-
-        <div className="flex items-center gap-1 text-[11px] text-slate-400">
-          <Clock size={12} className="text-slate-500" />
-          <span className="font-mono">{formatLastPing(sensor.lastPing)}</span>
-        </div>
       </div>
     </div>
   );
 };
+
+export default SensorCard;
