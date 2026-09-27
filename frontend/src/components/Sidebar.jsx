@@ -1,9 +1,10 @@
 import React from 'react';
-import { LayoutDashboard, Cpu, AlertTriangle, BarChart3, Home, User, LogIn, Leaf, Waves } from 'lucide-react';
+import { LayoutDashboard, Cpu, AlertTriangle, BarChart3, Home, User, LogIn, Leaf, Waves, Flame } from 'lucide-react';
 
 const navItems = [
   { id: 'home',      icon: Home,            label: 'Overview' },
-  { id: 'dashboard', icon: Waves,          label: 'Flood Monitoring Dashboard' },
+  { id: 'dashboard', icon: Waves,           label: 'Flood Monitoring Dashboard' },
+  { id: 'fire',      icon: Flame,           label: 'Forest Fire Monitoring Dashboard' },
   { id: 'sensors',   icon: Cpu,             label: 'Field Nodes' },
   { id: 'alerts',    icon: AlertTriangle,   label: 'Active Alerts' },
   { id: 'analytics', icon: BarChart3,       label: 'Trend Analysis' },

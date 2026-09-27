@@ -60,8 +60,19 @@ export function App() {
       case 'home':
         return <HomePage onNavigate={setActivePage} />;
       case 'dashboard':
+      case 'flood':
         return (
           <DashboardPage
+            mode="flood"
+            sensors={sensors}
+            alerts={alerts}
+            onAcknowledgeAlert={acknowledgeAlert}
+          />
+        );
+      case 'fire':
+        return (
+          <DashboardPage
+            mode="fire"
             sensors={sensors}
             alerts={alerts}
             onAcknowledgeAlert={acknowledgeAlert}
